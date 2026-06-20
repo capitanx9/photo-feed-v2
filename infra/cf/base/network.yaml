@@ -1,0 +1,187 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  photo-feed base network — VPC + 2 public subnets (eu-central-1a/b) + IGW +
+  shared EC2 security group. Exported values are imported by ec2-stage.yaml
+  (and any future ec2-prod.yaml).
+
+  Stack name: photo-feed-base-network
+  Deploy: aws cloudformation deploy --template-file infra/cf/base/network.yaml \
+            --stack-name photo-feed-base-network --region eu-central-1
+
+
+Parameters:
+
+  AdminIP:
+    Type: String
+    Description: >
+      CIDR allowed to SSH into EC2 (port 22). Default = my home IP.
+      Override at deploy time when working from a different network:
+        --parameter-overrides AdminIP=1.2.3.4/32
+    Default: 79.233.19.158/32
+    AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$
+    ConstraintDescription: Must be CIDR in form x.x.x.x/yy
+
+  VpcCidr:
+    Type: String
+    Description: VPC CIDR block. /16 gives 65k IPs — abundant for this project.
+    Default: 10.0.0.0/16
+
+  PublicSubnetACidr:
+    Type: String
+    Default: 10.0.1.0/24
+
+  PublicSubnetBCidr:
+    Type: String
+    Default: 10.0.2.0/24
+
+
+Resources:
+
+  # ----------------------------------------------------------------------
+  # VPC + Internet Gateway
+  # ----------------------------------------------------------------------
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: photo-feed-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: photo-feed-igw
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  # ----------------------------------------------------------------------
+  # Public subnets — one per AZ. EC2 lives in one of them; the second is a
+  # placeholder for any future multi-AZ resource (RDS, ALB) so we don't
+  # have to redo the network later.
+  # ----------------------------------------------------------------------
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnetACidr
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: photo-feed-public-a
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnetBCidr
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: photo-feed-public-b
+
+  # ----------------------------------------------------------------------
+  # Route table — both public subnets share one route table pointing at IGW.
+  # ----------------------------------------------------------------------
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: photo-feed-public-rt
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetARouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  # ----------------------------------------------------------------------
+  # Security group for EC2:
+  #   - 22  (SSH) only from AdminIP
+  #   - 80  (HTTP)  open  — for Let's Encrypt http-01 challenge + redirect
+  #   - 443 (HTTPS) open  — the actual app traffic
+  #   - all outbound
+  # ----------------------------------------------------------------------
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: photo-feed-ec2-sg
+      GroupDescription: Inbound 22 (admin), 80, 443; all outbound.
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AdminIP
+          Description: SSH from admin
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP (Let's Encrypt + redirect)
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS (app traffic)
+      Tags:
+        - Key: Name
+          Value: photo-feed-ec2-sg
+
+
+Outputs:
+
+  VpcId:
+    Description: VPC ID
+    Value: !Ref Vpc
+    Export:
+      Name: photo-feed-vpc-id
+
+  PublicSubnetAId:
+    Description: Public subnet A (eu-central-1a)
+    Value: !Ref PublicSubnetA
+    Export:
+      Name: photo-feed-public-subnet-a
+
+  PublicSubnetBId:
+    Description: Public subnet B (eu-central-1b)
+    Value: !Ref PublicSubnetB
+    Export:
+      Name: photo-feed-public-subnet-b
+
+  EC2SecurityGroupId:
+    Description: EC2 security group ID
+    Value: !Ref EC2SecurityGroup
+    Export:
+      Name: photo-feed-ec2-sg-id

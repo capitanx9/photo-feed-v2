@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  photo-feed base ECR — two repositories for the Django api image and the
+  Next.js web image. Lifecycle policy keeps the last 30 tagged images and
+  prunes untagged ones after 7 days.
+
+  Stack name: photo-feed-base-ecr
+  Deploy: aws cloudformation deploy --template-file infra/cf/base/ecr.yaml \
+            --stack-name photo-feed-base-ecr --region eu-central-1
+
+
+Resources:
+
+  # ----------------------------------------------------------------------
+  # photo-feed-api — Django/gunicorn image, pushed by build-web-back.
+  # ----------------------------------------------------------------------
+
+  ApiRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: photo-feed-api
+      ImageScanningConfiguration:
+        # Scan on every push so we know about CVEs in newly built images.
+        # Result viewable in ECR console / via DescribeImageScanFindings.
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 30 tagged images",
+                "selection": {
+                  "tagStatus": "tagged",
+                  "tagPatternList": ["*"],
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 30
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Remove untagged images after 7 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 7
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+  # ----------------------------------------------------------------------
+  # photo-feed-web — Next.js standalone image, pushed by build-web-front.
+  # ----------------------------------------------------------------------
+
+  WebRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: photo-feed-web
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 30 tagged images",
+                "selection": {
+                  "tagStatus": "tagged",
+                  "tagPatternList": ["*"],
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 30
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Remove untagged images after 7 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 7
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+
+Outputs:
+
+  ApiRepositoryUri:
+    Description: ECR repository URI for the api image
+    Value: !GetAtt ApiRepository.RepositoryUri
+    Export:
+      Name: photo-feed-api-ecr-uri
+
+  WebRepositoryUri:
+    Description: ECR repository URI for the web image
+    Value: !GetAtt WebRepository.RepositoryUri
+    Export:
+      Name: photo-feed-web-ecr-uri
+
+  ApiRepositoryArn:
+    Description: ECR repository ARN for the api image
+    Value: !GetAtt ApiRepository.Arn
+    Export:
+      Name: photo-feed-api-ecr-arn
+
+  WebRepositoryArn:
+    Description: ECR repository ARN for the web image
+    Value: !GetAtt WebRepository.Arn
+    Export:
+      Name: photo-feed-web-ecr-arn
