@@ -1,0 +1,397 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  photo-feed base IAM — OIDC provider for GitHub Actions, three CI roles,
+  and the EC2 instance role with ALL its policies (including S3 — the one
+  forgotten in v1 which broke production).
+
+  Stack name: photo-feed-base-iam
+  Deploy: aws cloudformation deploy --template-file infra/cf/base/iam.yaml \
+            --stack-name photo-feed-base-iam --capabilities CAPABILITY_NAMED_IAM \
+            --region eu-central-1
+
+
+Parameters:
+
+  GitHubOrg:
+    Type: String
+    Default: capitanx9
+    Description: GitHub username/org that owns the repo.
+
+  GitHubRepo:
+    Type: String
+    Default: photo-feed-v2
+    Description: Repository name.
+
+  AccountId:
+    Type: String
+    Default: "797890596022"
+    Description: AWS account ID (used in resource ARN restrictions).
+
+
+Resources:
+
+  # ======================================================================
+  # OIDC provider — the door for GitHub Actions to assume AWS roles.
+  #
+  # Without this, no GH Actions workflow can talk to AWS. Created once,
+  # shared across all three CI roles below.
+  # ======================================================================
+
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        # Default thumbprint for token.actions.githubusercontent.com.
+        # AWS now verifies via the library it ships with, so this is largely
+        # a formality, but the field is still required.
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+  # ======================================================================
+  # GitHub Actions role: photo-feed-github-actions-api
+  #
+  # Used by:
+  #   - build-web-back        (push image to ECR, mint bot token to bump tag)
+  #   - build-web-front       (same for web image)
+  #   - deploy-host-stage     (SSM SendCommand → apply.sh on EC2)
+  #
+  # Permissions:
+  #   - ECR push on photo-feed-api / photo-feed-web
+  #   - SSM SendCommand on EC2 with tag Application=photo-feed
+  #   - EC2 describe-instances (to find the target)
+  #   - SSM get-parameter on /photo-feed/*
+  # ======================================================================
+
+  GithubActionsApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: photo-feed-github-actions-api
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                # Bound to the main branch of this repo only.
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/main
+      Policies:
+        - PolicyName: ECRPushApiAndWeb
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:PutImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                Resource:
+                  - !Sub arn:aws:ecr:eu-central-1:${AccountId}:repository/photo-feed-api
+                  - !Sub arn:aws:ecr:eu-central-1:${AccountId}:repository/photo-feed-web
+        - PolicyName: SSMRunCommandOnPhotoFeedEC2
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ssm:SendCommand
+                Resource:
+                  - !Sub arn:aws:ec2:eu-central-1:${AccountId}:instance/*
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/Application: photo-feed
+              - Effect: Allow
+                Action:
+                  - ssm:SendCommand
+                Resource:
+                  - arn:aws:ssm:eu-central-1::document/AWS-RunShellScript
+              - Effect: Allow
+                Action:
+                  - ssm:GetCommandInvocation
+                  - ssm:ListCommandInvocations
+                Resource: "*"
+        - PolicyName: SSMParameterReadStage
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource:
+                  - !Sub arn:aws:ssm:eu-central-1:${AccountId}:parameter/photo-feed/stage/*
+
+  # ======================================================================
+  # GitHub Actions role: photo-feed-github-actions-lambdas
+  #
+  # Used by:
+  #   - deploy-lambdas-stage  (sam deploy in eu-central-1 + us-west-2)
+  #
+  # Permissions:
+  #   - CloudFormation/SAM deploy on photo-feed-lambdas-* stacks
+  #   - Lambda update
+  #   - IAM PassRole for the lambda execution role created inside the stacks
+  #   - S3 manage on uploads + generated buckets (managed by lambda stacks)
+  #   - SSM read for WebhookSharedSecret (used at deploy time as parameter)
+  # ======================================================================
+
+  GithubActionsLambdasRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: photo-feed-github-actions-lambdas
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/main
+      Policies:
+        - PolicyName: CloudFormationLambdaStacks
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:ValidateTemplate
+                Resource:
+                  - !Sub arn:aws:cloudformation:eu-central-1:${AccountId}:stack/photo-feed-lambdas-*/*
+                  - !Sub arn:aws:cloudformation:us-west-2:${AccountId}:stack/photo-feed-lambdas-*/*
+              # SAM uses --resolve-s3 which creates a managed bucket
+              # aws-sam-cli-managed-default-* — needs S3 access to that.
+              - Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::aws-sam-cli-managed-*
+                  - arn:aws:s3:::aws-sam-cli-managed-*/*
+              - Effect: Allow
+                Action:
+                  - lambda:*
+                Resource:
+                  - !Sub arn:aws:lambda:eu-central-1:${AccountId}:function:photo-feed-*
+                  - !Sub arn:aws:lambda:us-west-2:${AccountId}:function:photo-feed-*
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                  - iam:GetRole
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                Resource:
+                  - !Sub arn:aws:iam::${AccountId}:role/photo-feed-lambdas-*
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub arn:aws:ssm:eu-central-1:${AccountId}:parameter/photo-feed/stage/WEBHOOK_SHARED_SECRET
+
+  # ======================================================================
+  # GitHub Actions role: photo-feed-github-actions-infra
+  #
+  # Used by:
+  #   - deploy-infra-base       (deploys photo-feed-base-* stacks)
+  #   - deploy-infra-ec2-stage  (deploys photo-feed-ec2-stage)
+  #
+  # Permissions:
+  #   - CloudFormation full on photo-feed-* stacks (excl. lambdas — those
+  #     have a dedicated role)
+  #   - IAM PassRole / role manage on photo-feed-* roles
+  #   - EC2, Route53, ECR full on photo-feed-* (necessary for the stacks
+  #     they own)
+  # ======================================================================
+
+  GithubActionsInfraRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: photo-feed-github-actions-infra
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/main
+      Policies:
+        - PolicyName: CloudFormationInfraStacks
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:*
+                Resource:
+                  - !Sub arn:aws:cloudformation:eu-central-1:${AccountId}:stack/photo-feed-base-*/*
+                  - !Sub arn:aws:cloudformation:eu-central-1:${AccountId}:stack/photo-feed-ec2-*/*
+              - Effect: Allow
+                Action:
+                  - ec2:*
+                  - route53:*
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:*
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - iam:*
+                Resource:
+                  - !Sub arn:aws:iam::${AccountId}:role/photo-feed-*
+                  - !Sub arn:aws:iam::${AccountId}:instance-profile/photo-feed-*
+              - Effect: Allow
+                Action:
+                  - iam:CreateOpenIDConnectProvider
+                  - iam:GetOpenIDConnectProvider
+                  - iam:DeleteOpenIDConnectProvider
+                  - iam:UpdateOpenIDConnectProviderThumbprint
+                Resource: "*"
+
+  # ======================================================================
+  # EC2 Instance Role: PhotoFeedInstanceRole
+  #
+  # Attached to the EC2 instance via the InstanceProfile below.
+  # This is the role that the Django runtime on EC2 uses for:
+  #   - reading SSM secrets in apply.sh
+  #   - pulling ECR images
+  #   - PUT/GET on photo-feed-uploads bucket (THE policy missing in v1)
+  #   - SSM agent for SendCommand to work
+  # ======================================================================
+
+  PhotoFeedInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: PhotoFeedInstanceRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        # The policy whose absence killed prod in v1. Now part of IaC; can't
+        # be forgotten.
+        - PolicyName: PhotoFeedInstanceRole-S3Uploads
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: PhotoFeedUploadsRW
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:AbortMultipartUpload
+                  - s3:DeleteObject
+                Resource: arn:aws:s3:::photo-feed-uploads/*
+              - Sid: PhotoFeedUploadsListBucket
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: arn:aws:s3:::photo-feed-uploads
+        - PolicyName: PhotoFeedInstanceRole-SSMParameters
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource:
+                  - !Sub arn:aws:ssm:eu-central-1:${AccountId}:parameter/photo-feed/stage/*
+
+  PhotoFeedInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: PhotoFeedInstanceProfile
+      Roles:
+        - !Ref PhotoFeedInstanceRole
+
+
+Outputs:
+
+  GitHubOIDCProviderArn:
+    Description: OIDC provider ARN (referenced by all CI roles)
+    Value: !Ref GitHubOIDCProvider
+    Export:
+      Name: photo-feed-oidc-provider-arn
+
+  GithubActionsApiRoleArn:
+    Description: ARN of the CI role for build-web-* / deploy-host-*
+    Value: !GetAtt GithubActionsApiRole.Arn
+    Export:
+      Name: photo-feed-github-actions-api-role-arn
+
+  GithubActionsLambdasRoleArn:
+    Description: ARN of the CI role for deploy-lambdas-*
+    Value: !GetAtt GithubActionsLambdasRole.Arn
+    Export:
+      Name: photo-feed-github-actions-lambdas-role-arn
+
+  GithubActionsInfraRoleArn:
+    Description: ARN of the CI role for deploy-infra-*
+    Value: !GetAtt GithubActionsInfraRole.Arn
+    Export:
+      Name: photo-feed-github-actions-infra-role-arn
+
+  InstanceRoleArn:
+    Description: ARN of the EC2 instance role
+    Value: !GetAtt PhotoFeedInstanceRole.Arn
+    Export:
+      Name: photo-feed-instance-role-arn
+
+  InstanceProfileName:
+    Description: Name of the instance profile (used in ec2-stage.yaml)
+    Value: !Ref PhotoFeedInstanceProfile
+    Export:
+      Name: photo-feed-instance-profile-name
