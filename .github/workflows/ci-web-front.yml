@@ -1,0 +1,43 @@
+name: ci-web-front
+
+# Lint + build for packages/web (Next.js).
+#
+# No tests yet — added in Phase 6 alongside real components.
+# `next build` doubles as a type-check (tsc runs internally).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "packages/web/**"
+      - ".github/workflows/ci-web-front.yml"
+
+concurrency:
+  group: ci-web-front-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: packages/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: packages/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (eslint via next)
+        run: npm run lint
+
+      - name: Build (next build — includes tsc type-check)
+        run: npm run build

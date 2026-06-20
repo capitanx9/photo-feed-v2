@@ -1,0 +1,79 @@
+name: ci-infra
+
+# Validate infra artifacts:
+#   - CloudFormation templates  → cfn-lint
+#   - SAM templates             → sam validate (when lambdas/*.yaml exist)
+#   - shell scripts             → shellcheck (when apply.sh exists)
+#   - nginx config              → nginx -t (when nginx.conf exists)
+#
+# Most of those don't exist yet — they land in Phase 3. The workflow is
+# written so it doesn't fail on missing files: each step is wrapped to
+# no-op gracefully until the file appears.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/ci-infra.yml"
+
+concurrency:
+  group: ci-infra-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python (for cfn-lint)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install cfn-lint
+        run: pip install --quiet "cfn-lint>=1.0,<2"
+
+      - name: cfn-lint on CloudFormation templates
+        run: |
+          shopt -s globstar nullglob
+          files=(infra/cf/**/*.yaml)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::notice::No CF templates yet — skipping."
+            exit 0
+          fi
+          # SAM templates use Transform: AWS::Serverless-2016-10-31 which
+          # cfn-lint validates with rule set "L,W,I,E". Plain CF templates
+          # validate fine too — no flag needed.
+          cfn-lint "${files[@]}"
+
+      - name: shellcheck on shell scripts
+        run: |
+          shopt -s globstar nullglob
+          files=(infra/**/*.sh)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::notice::No shell scripts yet — skipping."
+            exit 0
+          fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck "${files[@]}"
+
+      - name: nginx -t on nginx config
+        run: |
+          shopt -s globstar nullglob
+          files=(infra/host/nginx/*.conf)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::notice::No nginx config yet — skipping."
+            exit 0
+          fi
+          # nginx -t needs a full nginx.conf with daemon off; easiest path
+          # is to drop the conf into a stock nginx container and let it
+          # validate. -T prints to stdout if valid, exits non-zero if not.
+          for f in "${files[@]}"; do
+            echo "--- validating $f ---"
+            docker run --rm -v "$PWD/$f:/etc/nginx/conf.d/default.conf:ro" \
+              nginx:1.27-alpine nginx -t
+          done
