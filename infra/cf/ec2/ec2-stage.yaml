@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  photo-feed stage EC2 — t3.medium with Elastic IP, attached
+  PhotoFeedInstanceProfile from base-iam. UserData bootstraps docker,
+  docker compose plugin, awscli, then sparse-checkout's only infra/host
+  into /srv/photo-feed.
+
+  Stack name: photo-feed-ec2-stage
+  Deploy: aws cloudformation deploy --template-file infra/cf/ec2/ec2-stage.yaml \
+            --stack-name photo-feed-ec2-stage --capabilities CAPABILITY_IAM \
+            --region eu-central-1
+
+  After first deploy: no DNS step needed — `<ip>.nip.io` resolves to the
+  Elastic IP automatically. The StageDomain output prints the exact hostname.
+  Bootstrap the cert by running certbot once via SSM (see runbook in
+  docs/runbooks/). When we move to a real Route 53 domain later, only the
+  StageDomain output (and dns.yaml) needs to change — apply.sh, nginx
+  template, and compose all read STAGE_DOMAIN dynamically.
+
+
+Parameters:
+
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    AllowedValues: [t3.small, t3.medium, t3.large]
+    Description: EC2 instance type for stage.
+
+  EC2KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: strongbox
+    Description: EC2 key pair name (must exist in this region beforehand).
+
+  UbuntuAMI:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: >
+      Latest Ubuntu 24.04 AMI ID. Resolved at deploy time from the public
+      SSM parameter Canonical publishes — no hardcoded AMI that goes stale.
+
+  GitHubRepoUrl:
+    Type: String
+    Default: https://github.com/capitanx9/photo-feed-v2.git
+    Description: Repo to sparse-checkout into /srv/photo-feed.
+
+  RootVolumeSizeGB:
+    Type: Number
+    Default: 30
+    MinValue: 16
+    Description: Root EBS volume size in GB.
+
+  BootstrapScript:
+    Type: String
+    NoEcho: false
+    Description: >
+      Body of infra/cf/ec2/bootstrap.sh, passed at deploy time via
+      --parameter-overrides "BootstrapScript=$(cat infra/cf/ec2/bootstrap.sh)".
+      Kept in a separate file so shellcheck/IDE see it as shell, not YAML.
+
+
+Resources:
+
+  # ----------------------------------------------------------------------
+  # Elastic IP — static public IP that survives instance recreation.
+  # Declared SEPARATELY (not embedded in instance) so it can outlive a
+  # rebuild of the instance.
+  # ----------------------------------------------------------------------
+
+  StageEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: photo-feed-stage-eip
+        - Key: Application
+          Value: photo-feed
+        - Key: Environment
+          Value: stage
+
+  StageEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt StageEIP.AllocationId
+      InstanceId: !Ref StageInstance
+
+  # ----------------------------------------------------------------------
+  # EC2 instance.
+  # ----------------------------------------------------------------------
+
+  StageInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref UbuntuAMI
+      KeyName: !Ref EC2KeyName
+      IamInstanceProfile: !ImportValue photo-feed-instance-profile-name
+      SubnetId: !ImportValue photo-feed-public-subnet-a
+      SecurityGroupIds:
+        - !ImportValue photo-feed-ec2-sg-id
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref RootVolumeSizeGB
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: photo-feed-stage
+        - Key: Application
+          Value: photo-feed
+        - Key: Environment
+          Value: stage
+      UserData:
+        # Thin wrapper around bootstrap.sh: export CF pseudo-parameters
+        # and the repo URL as env vars (because the .sh file is plain
+        # shell, not CF-Sub'd), then run the script body.
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            set -euxo pipefail
+            export CF_STACK_NAME="${StackName}"
+            export CF_REGION="${Region}"
+            export GH_REPO_URL="${RepoUrl}"
+            ${Script}
+          - StackName: !Ref AWS::StackName
+            Region: !Ref AWS::Region
+            RepoUrl: !Ref GitHubRepoUrl
+            Script: !Ref BootstrapScript
+
+    CreationPolicy:
+      ResourceSignal:
+        # Wait up to 10 min for UserData to finish and signal success.
+        # docker.io + awscli download is slow on first boot — 10 is safe.
+        Timeout: PT10M
+
+
+Outputs:
+
+  StageInstanceId:
+    Description: EC2 instance ID (used by SSM SendCommand)
+    Value: !Ref StageInstance
+    Export:
+      Name: photo-feed-stage-instance-id
+
+  StageElasticIP:
+    Description: Public IP of the stage instance
+    Value: !Ref StageEIP
+    Export:
+      Name: photo-feed-stage-eip
+
+  StageDomain:
+    Description: >
+      Stage hostname. While we wait for a proper Route 53 domain, we use
+      nip.io — a free wildcard-DNS service that maps `<ip>.nip.io` to
+      `<ip>` for any IP. Let's Encrypt supports nip.io subdomains, so
+      HTTPS works out of the box.
+    Value: !Sub
+      - ${IpDashed}.nip.io
+      # nip.io accepts both dot and dash forms; dash is friendlier in
+      # URLs and certificate CN displays.
+      - IpDashed: !Join ["-", !Split [".", !Ref StageEIP]]
+    Export:
+      Name: photo-feed-stage-domain
+
+  StageInstancePublicDnsName:
+    Description: AWS-assigned DNS name (does NOT work with Let's Encrypt)
+    Value: !GetAtt StageInstance.PublicDnsName
+    Export:
+      Name: photo-feed-stage-public-dns

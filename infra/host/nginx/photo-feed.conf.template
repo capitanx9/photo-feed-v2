@@ -1,0 +1,68 @@
+# photo-feed stage — nginx reverse proxy. TEMPLATE — substituted at apply
+# time by `envsubst '${STAGE_DOMAIN}'` in infra/host/apply.sh, producing
+# infra/host/nginx/photo-feed.conf. The rendered file is gitignored.
+#
+# - HTTP (80): redirect everything to HTTPS, except /.well-known/acme-challenge
+#   which certbot needs.
+# - HTTPS (443): /api/ /admin/ /static/ /media/ /internal/ → Django (port 8000)
+#                everything else                          → Next  (port 3000)
+#
+# bind-mounted into the nginx container; apply.sh runs nginx -t && -s reload
+# after every git pull so config changes apply without recreating the container.
+
+upstream backend {
+    server web:8000;
+}
+
+upstream frontend {
+    server web-front:3000;
+}
+
+# HTTP — redirect to HTTPS, except ACME challenge for certbot.
+server {
+    listen 80;
+    server_name ${STAGE_DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# HTTPS — the real entrypoint.
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${STAGE_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${STAGE_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${STAGE_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    client_max_body_size 20M;
+
+    # Static + media served directly by Django for now (whitenoise) —
+    # nginx just forwards. If we add CDN later this stays the change-
+    # point.
+    location ~ ^/(api|admin|static|media|internal)/ {
+        proxy_pass http://backend;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # Everything else → Next.js.
+    location / {
+        proxy_pass http://frontend;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+}
