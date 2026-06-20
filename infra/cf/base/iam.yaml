@@ -293,6 +293,17 @@ Resources:
                   - iam:DeleteOpenIDConnectProvider
                   - iam:UpdateOpenIDConnectProviderThumbprint
                 Resource: "*"
+              # Read public AWS-published SSM parameters (Canonical AMI IDs,
+              # ECS-optimised AMI IDs, etc.). Scoped to /aws/service/*
+              # which is read-only public data — never any of our secrets.
+              # ec2-stage.yaml uses this to resolve the latest Ubuntu 24.04
+              # AMI ID without pinning a value that would go stale.
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource:
+                  - arn:aws:ssm:eu-central-1::parameter/aws/service/*
 
   # ======================================================================
   # EC2 Instance Role: PhotoFeedInstanceRole
