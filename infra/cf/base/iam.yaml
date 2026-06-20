@@ -283,9 +283,16 @@ Resources:
               - Effect: Allow
                 Action:
                   - iam:*
+                # Two naming conventions in this stack:
+                #   - photo-feed-github-actions-*  (kebab-case CI roles)
+                #   - PhotoFeed*                   (PascalCase: PhotoFeedInstanceRole,
+                #                                   PhotoFeedInstanceProfile)
+                # Resource patterns cover both.
                 Resource:
                   - !Sub arn:aws:iam::${AccountId}:role/photo-feed-*
+                  - !Sub arn:aws:iam::${AccountId}:role/PhotoFeed*
                   - !Sub arn:aws:iam::${AccountId}:instance-profile/photo-feed-*
+                  - !Sub arn:aws:iam::${AccountId}:instance-profile/PhotoFeed*
               - Effect: Allow
                 Action:
                   - iam:CreateOpenIDConnectProvider
