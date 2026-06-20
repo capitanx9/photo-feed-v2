@@ -1,0 +1,73 @@
+name: ci-web-back
+
+# Lint + type-check + tests for packages/api (Django + DRF-JWT).
+#
+# On PRs runs without paths filter — it's a required status check, so it
+# must run on every PR even when no api code is touched (otherwise infra-
+# only PRs sit "pending" forever).
+# On push to main runs only when api code or workspace lockfile changed.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "packages/api/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - "ruff.toml"
+      - "mypy.ini"
+      - ".github/workflows/ci-web-back.yml"
+
+concurrency:
+  group: ci-web-back-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Read .python-version
+        id: pyver
+        run: echo "version=$(cat .python-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        run: uv python install ${{ steps.pyver.outputs.version }}
+
+      - name: Install workspace dependencies
+        run: uv sync --frozen --all-packages
+
+      - name: Lint (ruff)
+        run: uv run --package api ruff check packages/api
+
+      - name: Format check (ruff format)
+        run: uv run --package api ruff format --check packages/api
+
+      - name: Type-check (mypy)
+        # Soft failure for now: scaffold has no type-hints yet, full mypy
+        # pass will land alongside the real code in Phase 6.
+        run: uv run --package api mypy packages/api/src || true
+
+      - name: Tests (pytest)
+        working-directory: packages/api
+        # pytest exit 5 = no tests collected. Treat that as success — the
+        # scaffold ships without tests; real tests come in Phase 6.
+        run: |
+          set +e
+          uv run pytest -q
+          rc=$?
+          if [ $rc -eq 5 ]; then
+            echo "::notice::No tests collected — accepting as pass while scaffold has no tests."
+            exit 0
+          fi
+          exit $rc

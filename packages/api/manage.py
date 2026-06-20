@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 """Django's command-line utility for administrative tasks."""
-import sys, pathlib
-sys.path.insert(0, str(pathlib.Path(__file__).parent / 'src'))
+
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent / "src"))
 import os
 import sys
 

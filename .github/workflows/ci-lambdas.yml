@@ -1,0 +1,77 @@
+name: ci-lambdas
+
+# Lint + tests for the two lambda packages (cut_image, generate_image).
+# Skeletons are empty uv-init packages today; real handlers land in Phase 6.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "packages/cut_image/**"
+      - "packages/generate_image/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - "ruff.toml"
+      - ".github/workflows/ci-lambdas.yml"
+
+concurrency:
+  group: ci-lambdas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Read .python-version
+        id: pyver
+        run: echo "version=$(cat .python-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        run: uv python install ${{ steps.pyver.outputs.version }}
+
+      - name: Install workspace dependencies
+        run: uv sync --frozen --all-packages
+
+      - name: Lint (ruff)
+        run: uv run ruff check packages/cut_image packages/generate_image
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check packages/cut_image packages/generate_image
+
+      - name: Type-check (mypy)
+        run: uv run mypy packages/cut_image packages/generate_image || true
+
+      - name: Tests cut_image
+        working-directory: packages/cut_image
+        run: |
+          set +e
+          uv run pytest -q
+          rc=$?
+          if [ $rc -eq 5 ]; then
+            echo "::notice::cut_image: no tests collected — pass."
+            exit 0
+          fi
+          exit $rc
+
+      - name: Tests generate_image
+        working-directory: packages/generate_image
+        run: |
+          set +e
+          uv run pytest -q
+          rc=$?
+          if [ $rc -eq 5 ]; then
+            echo "::notice::generate_image: no tests collected — pass."
+            exit 0
+          fi
+          exit $rc
