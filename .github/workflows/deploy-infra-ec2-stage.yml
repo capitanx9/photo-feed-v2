@@ -1,0 +1,76 @@
+name: deploy-infra-ec2-stage
+
+# Applies CloudFormation changes to photo-feed-ec2-stage.
+#
+# The bootstrap.sh body is passed in as a parameter override so it lives
+# as a real shell file (lintable by ci-infra/shellcheck) instead of an
+# inline blob inside the YAML.
+#
+# First run: creates the instance, runs UserData, allocates Elastic IP.
+# Subsequent runs (e.g. AMI bump, instance-type change) update in place.
+# CreationPolicy in ec2-stage.yaml waits up to 10 min for the in-instance
+# cfn-signal — if UserData fails, the stack rolls back automatically.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/cf/ec2/**"
+      - ".github/workflows/deploy-infra-ec2-stage.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: photo-feed-deploy-infra-ec2-stage
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-central-1
+  ROLE_ARN: arn:aws:iam::797890596022:role/photo-feed-github-actions-infra
+  STACK_NAME: photo-feed-ec2-stage
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy ec2-stage
+        run: |
+          # Pass bootstrap.sh content as a CloudFormation parameter.
+          # CF Parameters max 4096 bytes — current bootstrap is ~3 KB.
+          BOOTSTRAP_BODY="$(cat infra/cf/ec2/bootstrap.sh)"
+          aws cloudformation deploy \
+            --template-file infra/cf/ec2/ec2-stage.yaml \
+            --stack-name "${STACK_NAME}" \
+            --capabilities CAPABILITY_IAM \
+            --region "${AWS_REGION}" \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides "BootstrapScript=${BOOTSTRAP_BODY}"
+
+      - name: Report Elastic IP and stage domain
+        # nip.io maps `<ip>.nip.io` → `<ip>` automatically. No DNS step
+        # needed. When we move to a real Route 53 domain, this prints
+        # the value of the StageDomain output as-is — the workflow
+        # doesn't need to know which DNS scheme is in play.
+        run: |
+          EIP=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --region "${AWS_REGION}" \
+            --query "Stacks[0].Outputs[?OutputKey=='StageElasticIP'].OutputValue" \
+            --output text)
+          DOMAIN=$(aws cloudformation describe-stacks \
+            --stack-name "${STACK_NAME}" \
+            --region "${AWS_REGION}" \
+            --query "Stacks[0].Outputs[?OutputKey=='StageDomain'].OutputValue" \
+            --output text)
+          echo "::notice title=Stage instance::IP=${EIP} domain=${DOMAIN}"

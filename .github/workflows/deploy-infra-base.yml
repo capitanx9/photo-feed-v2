@@ -1,0 +1,75 @@
+name: deploy-infra-base
+
+# Applies CloudFormation changes to the base stacks:
+#   network -> iam -> ecr -> secrets
+#
+# Triggered on push to main when anything in infra/cf/base/ changes.
+# Deploy order matters: iam depends on nothing, network depends on
+# nothing, ecr depends on nothing, secrets depends on nothing — they're
+# actually independent. We still deploy in a fixed order so logs are
+# predictable. Each stack idempotently no-ops if there's no diff.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/cf/base/**"
+      - ".github/workflows/deploy-infra-base.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: photo-feed-deploy-infra-base
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # OIDC to assume the infra role
+  contents: read
+
+env:
+  AWS_REGION: eu-central-1
+  ROLE_ARN: arn:aws:iam::797890596022:role/photo-feed-github-actions-infra
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy network
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/base/network.yaml \
+            --stack-name photo-feed-base-network \
+            --region "${AWS_REGION}" \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy iam
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/base/iam.yaml \
+            --stack-name photo-feed-base-iam \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region "${AWS_REGION}" \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy ecr
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/base/ecr.yaml \
+            --stack-name photo-feed-base-ecr \
+            --region "${AWS_REGION}" \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy secrets
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/base/secrets.yaml \
+            --stack-name photo-feed-base-secrets \
+            --region "${AWS_REGION}" \
+            --no-fail-on-empty-changeset

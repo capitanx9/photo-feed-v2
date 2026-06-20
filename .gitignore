@@ -62,3 +62,6 @@ dmypy.json
 .env.*.local
 celerybeat-schedule
 celerybeat.pid
+
+# Rendered host configs (produced by infra/host/apply.sh)
+infra/host/nginx/photo-feed.conf
