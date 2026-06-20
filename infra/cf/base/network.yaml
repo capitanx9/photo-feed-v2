@@ -128,7 +128,7 @@ Resources:
   # ----------------------------------------------------------------------
   # Security group for EC2:
   #   - 22  (SSH) only from AdminIP
-  #   - 80  (HTTP)  open  — for Let's Encrypt http-01 challenge + redirect
+  #   - 80  (HTTP)  open  — for Lets Encrypt http-01 challenge + redirect
   #   - 443 (HTTPS) open  — the actual app traffic
   #   - all outbound
   # ----------------------------------------------------------------------
@@ -149,7 +149,7 @@ Resources:
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
-          Description: HTTP (Let's Encrypt + redirect)
+          Description: HTTP (Lets Encrypt http-01 + redirect to 443)
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443

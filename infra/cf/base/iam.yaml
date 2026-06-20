@@ -129,16 +129,16 @@ Resources:
                   - ssm:GetCommandInvocation
                   - ssm:ListCommandInvocations
                 Resource: "*"
-        - PolicyName: SSMParameterReadStage
+        - PolicyName: SecretsManagerReadStage
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
-                  - ssm:GetParameter
-                  - ssm:GetParameters
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
                 Resource:
-                  - !Sub arn:aws:ssm:eu-central-1:${AccountId}:parameter/photo-feed/stage/*
+                  - !Sub arn:aws:secretsmanager:eu-central-1:${AccountId}:secret:/photo-feed/stage/*
 
   # ======================================================================
   # GitHub Actions role: photo-feed-github-actions-lambdas
@@ -225,9 +225,9 @@ Resources:
                   - !Sub arn:aws:iam::${AccountId}:role/photo-feed-lambdas-*
               - Effect: Allow
                 Action:
-                  - ssm:GetParameter
+                  - secretsmanager:GetSecretValue
                 Resource:
-                  - !Sub arn:aws:ssm:eu-central-1:${AccountId}:parameter/photo-feed/stage/WEBHOOK_SHARED_SECRET
+                  - !Sub arn:aws:secretsmanager:eu-central-1:${AccountId}:secret:/photo-feed/stage/WEBHOOK_SHARED_SECRET-*
 
   # ======================================================================
   # GitHub Actions role: photo-feed-github-actions-infra
@@ -339,16 +339,16 @@ Resources:
                 Effect: Allow
                 Action: s3:ListBucket
                 Resource: arn:aws:s3:::photo-feed-uploads
-        - PolicyName: PhotoFeedInstanceRole-SSMParameters
+        - PolicyName: PhotoFeedInstanceRole-SecretsManagerStage
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
-                  - ssm:GetParameter
-                  - ssm:GetParameters
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
                 Resource:
-                  - !Sub arn:aws:ssm:eu-central-1:${AccountId}:parameter/photo-feed/stage/*
+                  - !Sub arn:aws:secretsmanager:eu-central-1:${AccountId}:secret:/photo-feed/stage/*
 
   PhotoFeedInstanceProfile:
     Type: AWS::IAM::InstanceProfile
