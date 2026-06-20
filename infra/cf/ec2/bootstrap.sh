@@ -69,8 +69,11 @@ install -d -o ubuntu -g ubuntu /srv/photo-feed
 sudo -u ubuntu git clone --filter=blob:none --no-checkout \
   "${GH_REPO_URL}" /srv/photo-feed
 cd /srv/photo-feed
-sudo -u ubuntu git sparse-checkout init --cone
-sudo -u ubuntu git sparse-checkout set infra/host
+# --no-cone gives precise control: ONLY paths under infra/host/ end up on
+# disk. --cone (default) would also keep all root-level files, which is
+# wider than we want.
+sudo -u ubuntu git sparse-checkout init --no-cone
+sudo -u ubuntu git sparse-checkout set '/infra/host/*'
 sudo -u ubuntu git checkout main
 
 # ----------------------------------------------------------------------
