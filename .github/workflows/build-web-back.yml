@@ -1,0 +1,156 @@
+name: build-web-back
+
+# Build the api image and push it to ECR, then bump API_IMAGE_TAG in
+# infra/host/images.env via the photo-feed-bot-v2 GitHub App.
+#
+# The bump commit lands in main directly (the bot is a bypass actor in
+# the main ruleset) and triggers deploy-host-stage via workflow_run.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/api/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - "packages/api/Dockerfile"
+      - ".github/workflows/build-web-back.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: photo-feed-build-web-back
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # OIDC to assume the api role for ECR push
+  contents: read    # checkout
+  # Note: we do NOT request contents:write here. The default GITHUB_TOKEN
+  # can't bypass the main ruleset; we mint a separate bot App token for
+  # that step.
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REGISTRY: 797890596022.dkr.ecr.eu-central-1.amazonaws.com
+  ECR_REPO: photo-feed-api
+  IMAGE_TAG_KEY: API_IMAGE_TAG
+  ROLE_ARN: arn:aws:iam::797890596022:role/photo-feed-github-actions-api
+
+jobs:
+  build-and-bump:
+    runs-on: ubuntu-24.04
+    steps:
+      # ---- Bot token (used later for the bump push) -----------------
+      - name: Mint photo-feed-bot-v2 token
+        id: bot-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      # ---- Checkout with the bot token so we can push later ---------
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.bot-token.outputs.token }}
+          # Full history so we can rebase against a moving main in the
+          # bump-retry loop.
+          fetch-depth: 0
+
+      # ---- AWS via OIDC ---------------------------------------------
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: ECR login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ---- Compute image tag (SHA12 of the commit being built) ------
+      - name: Compute image tag
+        id: tag
+        run: |
+          TAG="${GITHUB_SHA::12}"
+          echo "tag=$TAG"                                   >> "$GITHUB_OUTPUT"
+          echo "uri=${ECR_REGISTRY}/${ECR_REPO}:${TAG}"     >> "$GITHUB_OUTPUT"
+          echo "uri_cache=${ECR_REGISTRY}/${ECR_REPO}:cache" >> "$GITHUB_OUTPUT"
+
+      # ---- Build + push ---------------------------------------------
+      - name: Build + push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/api/Dockerfile
+          push: true
+          tags: ${{ steps.tag.outputs.uri }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ---- Find the originating PR number for parity in commit msg --
+      - name: Find originating PR number
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.bot-token.outputs.token }}
+        run: |
+          PR="$(gh pr list --search "${GITHUB_SHA}" --state merged \
+                          --json number --jq '.[0].number // empty')"
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+          if [ -n "$PR" ]; then
+            echo "::notice::Build triggered by squashed PR #${PR}"
+          fi
+
+      # ---- Bump API_IMAGE_TAG in infra/host/images.env --------------
+      - name: Bump API_IMAGE_TAG in infra/host/images.env
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          FILE=infra/host/images.env
+
+          git config user.name  "photo-feed-bot-v2[bot]"
+          git config user.email "photo-feed-bot-v2[bot]@users.noreply.github.com"
+
+          PR_SUFFIX=""
+          [ -n "$PR" ] && PR_SUFFIX=" (#${PR})"
+          SUBJECT="[deploy] ci(build-web-back): bump API_IMAGE_TAG to ${TAG}${PR_SUFFIX}"
+
+          # Retry loop. On each attempt we re-fetch main and re-apply the
+          # awk edit from scratch — that way a concurrent build-web-front
+          # bump of WEB_IMAGE_TAG can't conflict with us, because we
+          # always start from the freshest main and edit only our line.
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+
+            tmp="$(mktemp)"
+            awk -v new="API_IMAGE_TAG=${TAG}" '
+              /^API_IMAGE_TAG=/ { print new; next }
+              { print }
+            ' "$FILE" > "$tmp"
+            mv "$tmp" "$FILE"
+
+            if git diff --quiet -- "$FILE"; then
+              echo "No change in $FILE (same tag as before) — skipping commit."
+              exit 0
+            fi
+
+            git add "$FILE"
+            git commit -m "$SUBJECT" \
+                       -m "Triggered by: ${PR:+#${PR}}" \
+                       -m "Image: ${ECR_REPO}:${TAG}"
+
+            if git push origin HEAD:main; then
+              echo "::notice::Bumped API_IMAGE_TAG to ${TAG}${PR_SUFFIX}"
+              exit 0
+            fi
+
+            echo "push attempt $attempt failed (main moved); resetting and retrying..."
+            sleep $((attempt * 2))
+          done
+
+          echo "::error::could not push bump after 5 attempts"
+          exit 1

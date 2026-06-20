@@ -1,0 +1,143 @@
+name: deploy-host-stage
+
+# Apply the host-side stack on the stage EC2.
+#
+# Two trigger modes, no overlap:
+#
+#   1. workflow_run from build-web-back / build-web-front (success).
+#      The build workflow has already pushed a bump commit to main;
+#      we just need to run apply.sh so the new image is pulled.
+#
+#   2. push to main with paths in infra/host/**. For infra-only changes
+#      (nginx.conf, compose, apply.sh itself) that don't go through a
+#      build but still need to land on the host.
+#
+# We do NOT include infra/host/** paths in build-web-* workflow_run
+# trigger to avoid double-firing on bumps.
+#
+# Serialised by a concurrency group so two runs can never race the
+# same apply.sh on EC2.
+
+on:
+  workflow_run:
+    workflows: ["build-web-back", "build-web-front"]
+    types: [completed]
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "infra/host/**"
+      - ".github/workflows/deploy-host-stage.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: photo-feed-host-stage
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # OIDC for SSM SendCommand
+  contents: read
+
+env:
+  AWS_REGION: eu-central-1
+  ROLE_ARN: arn:aws:iam::797890596022:role/photo-feed-github-actions-api
+  EC2_TAG_APP: photo-feed
+  EC2_TAG_ENV: stage
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    # workflow_run fires for both success and failure. Skip the deploy
+    # if the upstream build failed — the bump commit never landed and
+    # we'd be applying a stale main with stale images.env.
+    # For push / workflow_dispatch this expression is always true.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Find stage EC2 instance
+        id: ec2
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Application,Values=${EC2_TAG_APP}" \
+                      "Name=tag:Environment,Values=${EC2_TAG_ENV}" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "::error::No running EC2 with tags Application=${EC2_TAG_APP} Environment=${EC2_TAG_ENV}"
+            exit 1
+          fi
+          echo "instance=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+          echo "::notice::Target instance: $INSTANCE_ID"
+
+      - name: SSM SendCommand → apply.sh
+        id: ssm
+        run: |
+          INSTANCE="${{ steps.ec2.outputs.instance }}"
+
+          # SSM Agent runs as root. Drop privileges to ubuntu (owner of
+          # /srv/photo-feed and member of docker group). -E is blocked
+          # by Ubuntu's default sudoers, so env is passed positionally.
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy-host-stage ${GITHUB_SHA::12}" \
+            --parameters '{
+              "commands": [
+                "set -euo pipefail",
+                "cd /srv/photo-feed",
+                "sudo -u ubuntu AWS_REGION=${{ env.AWS_REGION }} bash infra/host/apply.sh"
+              ],
+              "executionTimeout": ["600"]
+            }' \
+            --output text --query Command.CommandId)
+          echo "command=$CMD_ID" >> "$GITHUB_OUTPUT"
+          echo "::notice::SSM command: $CMD_ID"
+
+      - name: Wait for SSM command
+        run: |
+          CMD="${{ steps.ssm.outputs.command }}"
+          INSTANCE="${{ steps.ec2.outputs.instance }}"
+
+          # Brief warm-up — SSM needs a moment to register the command.
+          sleep 3
+
+          for i in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$CMD" --instance-id "$INSTANCE" \
+              --query Status --output text 2>/dev/null || echo "Pending")
+            echo "attempt $i: $STATUS"
+            case "$STATUS" in
+              Success)
+                # Print stdout for visibility, then succeed.
+                echo "----- apply.sh stdout -----"
+                aws ssm get-command-invocation \
+                  --command-id "$CMD" --instance-id "$INSTANCE" \
+                  --query StandardOutputContent --output text
+                exit 0
+                ;;
+              Failed|Cancelled|TimedOut)
+                echo "::error::apply ended with $STATUS"
+                echo "----- apply.sh stdout -----"
+                aws ssm get-command-invocation \
+                  --command-id "$CMD" --instance-id "$INSTANCE" \
+                  --query StandardOutputContent --output text
+                echo "----- apply.sh stderr -----"
+                aws ssm get-command-invocation \
+                  --command-id "$CMD" --instance-id "$INSTANCE" \
+                  --query StandardErrorContent --output text
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+
+          echo "::error::apply did not finish in 10 min"
+          exit 1
