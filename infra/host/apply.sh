@@ -86,6 +86,12 @@ aws ecr get-login-password --region "${AWS_REGION}" \
 # ${STAGE_DOMAIN} so we substitute it once here instead of teaching
 # nginx to read env vars at runtime (it can, but requires extra wiring
 # and surprises if a key isn't set).
+#
+# The single-quoted '${STAGE_DOMAIN}' is intentional: envsubst expects
+# the variable names literally (not shell-expanded) and substitutes
+# only those listed. Without the quotes, the shell would expand
+# ${STAGE_DOMAIN} and envsubst would receive an empty whitelist.
+# shellcheck disable=SC2016
 envsubst '${STAGE_DOMAIN}' \
     < infra/host/nginx/photo-feed.conf.template \
     > infra/host/nginx/photo-feed.conf
