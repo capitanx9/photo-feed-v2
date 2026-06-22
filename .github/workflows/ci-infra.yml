@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
+  ci-infra:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
