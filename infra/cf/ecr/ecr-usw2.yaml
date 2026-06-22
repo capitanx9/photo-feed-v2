@@ -1,17 +1,17 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >
-  photo-feed base ECR (us-west-2) — repository for the generate_image
-  Lambda image. generate_image runs in us-west-2 (where Bedrock SD3 lives),
-  so its ECR repo must live there too. (cut_image runs in eu-central-1 and
-  its repo lives in the main photo-feed-base-ecr stack.)
+  photo-feed ECR (us-west-2) — repository for the generate_image Lambda
+  image. generate_image runs in us-west-2 (next to Bedrock SD3), so its
+  ECR repo lives there too. cut_image runs in eu-central-1 and its repo
+  is in photo-feed-ecr-euc1.
 
-  This is a separate stack from photo-feed-base-ecr because CloudFormation
-  stacks are region-scoped.
+  Separate stack from photo-feed-ecr-euc1 because CloudFormation stacks
+  are region-scoped.
 
-  Stack name: photo-feed-base-ecr-usw2
-  Deploy: aws cloudformation deploy --template-file infra/cf/base/ecr-usw2.yaml \
-            --stack-name photo-feed-base-ecr-usw2 --region us-west-2
+  Stack name: photo-feed-ecr-usw2
+  Deploy: aws cloudformation deploy --template-file infra/cf/ecr/ecr-usw2.yaml \
+            --stack-name photo-feed-ecr-usw2 --region us-west-2
 
 
 Resources:

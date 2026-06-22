@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: photo-feed S3 (eu-central-1) — uploads bucket (raw/ and processed/).
+
+# Stack name: photo-feed-s3-euc1
+# Deploy: aws cloudformation deploy --template-file infra/cf/s3/s3-euc1.yaml \
+#           --stack-name photo-feed-s3-euc1 --region eu-central-1
+#
+# Object key prefixes:
+#   raw/<user_id>/<media_id>.{jpg,png,...}
+#       Just-uploaded file via presigned PUT. Cut by cut_image Lambda.
+#       Lifecycle: delete after 7 days (resized copy already exists).
+#
+#   processed/<user_id>/<media_id>.jpg
+#       512x512 JPEG produced by cut_image OR cross-region copy from
+#       generated-usw2 drafts/ when an AI variant is approved.
+#       Lifecycle: permanent. Access: presigned GET only (no public read).
+#
+# CORS: AllowedOrigins covers the stage nip.io fallback and any subdomain
+# on the eventual real domain. PUT-only — the browser uploads raw files
+# directly with the presigned URL Django mints.
+#
+# No public-read on processed/. Django mints short-lived presigned GET
+# URLs in serializers (matches v1 behaviour — see PostMediaSerializer.url).
+
+
+Resources:
+
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: photo-feed-uploads
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      CorsConfiguration:
+        CorsRules:
+          - Id: BrowserPresignedPUT
+            AllowedMethods: [PUT]
+            AllowedOrigins:
+              # Stage nip.io fallback until the real domain ships in Phase 7.
+              - "https://*.nip.io"
+              # Reserved for the Cloudflare-registered domain. Tighten this
+              # in Phase 7 once the FQDN is known.
+              - "https://*.photo-feed.click"
+            AllowedHeaders: ["*"]
+            ExposedHeaders: [ETag]
+            MaxAge: 3000
+      LifecycleConfiguration:
+        Rules:
+          # raw/ files are short-lived: cut_image reads them, writes the
+          # 512x512 copy under processed/, and the raw original is dead
+          # weight. 7 days gives slack for retries / debugging without
+          # leaking storage.
+          - Id: ExpireRaw
+            Status: Enabled
+            Prefix: raw/
+            ExpirationInDays: 7
+          # Aborted multipart uploads are billable. Auto-clean after 1 day.
+          - Id: AbortIncompleteMultipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+
+Outputs:
+
+  UploadsBucketName:
+    Description: Name of the uploads bucket
+    Value: !Ref UploadsBucket
+    Export:
+      Name: photo-feed-uploads-bucket-name
+
+  UploadsBucketArn:
+    Description: ARN of the uploads bucket
+    Value: !GetAtt UploadsBucket.Arn
+    Export:
+      Name: photo-feed-uploads-bucket-arn
