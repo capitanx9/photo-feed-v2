@@ -20,11 +20,10 @@ services:
     image: ${ECR_REGISTRY}/photo-feed-api:${API_IMAGE_TAG}
     restart: unless-stopped
     environment:
-      DJANGO_SETTINGS_MODULE: api.settings.prod
+      # DJANGO_SETTINGS_MODULE (api.settings) and PYTHONPATH (/app/src)
+      # are baked into the Dockerfile — don't override them here.
       DJANGO_DEBUG: "0"
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
-
-      PYTHONPATH: /app/packages/api/src
 
       ALLOWED_HOSTS: ${STAGE_DOMAIN}
       CSRF_TRUSTED_ORIGINS: https://${STAGE_DOMAIN}
