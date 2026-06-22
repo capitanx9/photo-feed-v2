@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  photo-feed base ECR (us-west-2) — repository for the generate_image
+  Lambda image. generate_image runs in us-west-2 (where Bedrock SD3 lives),
+  so its ECR repo must live there too. (cut_image runs in eu-central-1 and
+  its repo lives in the main photo-feed-base-ecr stack.)
+
+  This is a separate stack from photo-feed-base-ecr because CloudFormation
+  stacks are region-scoped.
+
+  Stack name: photo-feed-base-ecr-usw2
+  Deploy: aws cloudformation deploy --template-file infra/cf/base/ecr-usw2.yaml \
+            --stack-name photo-feed-base-ecr-usw2 --region us-west-2
+
+
+Resources:
+
+  # ----------------------------------------------------------------------
+  # photo-feed-generate-image — Bedrock SD3 Lambda, pushed by build-generate-image.
+  # ----------------------------------------------------------------------
+
+  GenerateImageRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: photo-feed-generate-image
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 30 tagged images",
+                "selection": {
+                  "tagStatus": "tagged",
+                  "tagPatternList": ["*"],
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 30
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Remove untagged images after 7 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 7
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+
+Outputs:
+
+  GenerateImageRepositoryUri:
+    Description: ECR repository URI for the generate_image Lambda
+    Value: !GetAtt GenerateImageRepository.RepositoryUri
+    Export:
+      Name: photo-feed-generate-image-ecr-uri
+
+  GenerateImageRepositoryArn:
+    Description: ECR repository ARN for the generate_image Lambda
+    Value: !GetAtt GenerateImageRepository.Arn
+    Export:
+      Name: photo-feed-generate-image-ecr-arn
