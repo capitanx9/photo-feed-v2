@@ -1,9 +1,11 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >
-  photo-feed base ECR — two repositories for the Django api image and the
-  Next.js web image. Lifecycle policy keeps the last 30 tagged images and
-  prunes untagged ones after 7 days.
+  photo-feed base ECR (eu-central-1) — repositories for images that run
+  in eu-central-1: Django api, Next.js web, and cut_image Lambda.
+  generate_image lives in us-west-2 next to Bedrock; its repo is in the
+  photo-feed-base-ecr-usw2 stack. Lifecycle policy keeps the last 30
+  tagged images and prunes untagged ones after 7 days.
 
   Stack name: photo-feed-base-ecr
   Deploy: aws cloudformation deploy --template-file infra/cf/base/ecr.yaml \
@@ -94,6 +96,50 @@ Resources:
             ]
           }
 
+  # ----------------------------------------------------------------------
+  # photo-feed-cut-image — Pillow square-crop Lambda image,
+  # pushed by build-cut-image. The Lambda itself runs in eu-central-1
+  # (next to the uploads bucket), so its image lives in this regional
+  # ECR. The other Lambda (generate_image) lives in us-west-2 next to
+  # Bedrock — see photo-feed-base-ecr-usw2 stack.
+  # ----------------------------------------------------------------------
+
+  CutImageRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: photo-feed-cut-image
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 30 tagged images",
+                "selection": {
+                  "tagStatus": "tagged",
+                  "tagPatternList": ["*"],
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 30
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Remove untagged images after 7 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 7
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
 
 Outputs:
 
@@ -120,3 +166,15 @@ Outputs:
     Value: !GetAtt WebRepository.Arn
     Export:
       Name: photo-feed-web-ecr-arn
+
+  CutImageRepositoryUri:
+    Description: ECR repository URI for the cut_image Lambda
+    Value: !GetAtt CutImageRepository.RepositoryUri
+    Export:
+      Name: photo-feed-cut-image-ecr-uri
+
+  CutImageRepositoryArn:
+    Description: ECR repository ARN for the cut_image Lambda
+    Value: !GetAtt CutImageRepository.Arn
+    Export:
+      Name: photo-feed-cut-image-ecr-arn

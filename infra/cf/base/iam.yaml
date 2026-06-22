@@ -228,6 +228,26 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Resource:
                   - !Sub arn:aws:secretsmanager:eu-central-1:${AccountId}:secret:/photo-feed/stage/WEBHOOK_SHARED_SECRET-*
+              # ECR push for the two Lambda images. cut_image lives in
+              # eu-central-1 (next to the uploads bucket), generate_image
+              # in us-west-2 (next to Bedrock). build-cut-image and
+              # build-generate-image workflows use this role to push.
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:PutImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                Resource:
+                  - !Sub arn:aws:ecr:eu-central-1:${AccountId}:repository/photo-feed-cut-image
+                  - !Sub arn:aws:ecr:us-west-2:${AccountId}:repository/photo-feed-generate-image
 
   # ======================================================================
   # GitHub Actions role: photo-feed-github-actions-infra
@@ -271,6 +291,9 @@ Resources:
                 Resource:
                   - !Sub arn:aws:cloudformation:eu-central-1:${AccountId}:stack/photo-feed-base-*/*
                   - !Sub arn:aws:cloudformation:eu-central-1:${AccountId}:stack/photo-feed-ec2-*/*
+                  # ecr-usw2 lives in us-west-2 (next to Bedrock-bound Lambda).
+                  # Same naming convention (photo-feed-base-*), different region.
+                  - !Sub arn:aws:cloudformation:us-west-2:${AccountId}:stack/photo-feed-base-*/*
               - Effect: Allow
                 Action:
                   - ec2:*

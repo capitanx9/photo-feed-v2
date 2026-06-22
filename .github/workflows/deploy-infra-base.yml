@@ -1,13 +1,17 @@
 name: deploy-infra-base
 
 # Applies CloudFormation changes to the base stacks:
-#   network -> iam -> ecr -> secrets
+#   network -> iam -> ecr (euc1) -> ecr-usw2 -> secrets
 #
 # Triggered on push to main when anything in infra/cf/base/ changes.
 # Deploy order matters: iam depends on nothing, network depends on
 # nothing, ecr depends on nothing, secrets depends on nothing — they're
 # actually independent. We still deploy in a fixed order so logs are
 # predictable. Each stack idempotently no-ops if there's no diff.
+#
+# Most stacks live in eu-central-1. ecr-usw2 is the one exception —
+# it holds the ECR repo for the generate_image Lambda, which runs in
+# us-west-2 next to Bedrock. Same naming convention, different region.
 
 on:
   push:
@@ -58,12 +62,20 @@ jobs:
             --region "${AWS_REGION}" \
             --no-fail-on-empty-changeset
 
-      - name: Deploy ecr
+      - name: Deploy ecr (eu-central-1)
         run: |
           aws cloudformation deploy \
             --template-file infra/cf/base/ecr.yaml \
             --stack-name photo-feed-base-ecr \
             --region "${AWS_REGION}" \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy ecr (us-west-2)
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/base/ecr-usw2.yaml \
+            --stack-name photo-feed-base-ecr-usw2 \
+            --region us-west-2 \
             --no-fail-on-empty-changeset
 
       - name: Deploy secrets
