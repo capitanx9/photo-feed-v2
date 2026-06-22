@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-and-build:
+  ci-web-front:
     runs-on: ubuntu-24.04
     defaults:
       run:
