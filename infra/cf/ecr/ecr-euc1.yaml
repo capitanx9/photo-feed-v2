@@ -1,15 +1,15 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >
-  photo-feed base ECR (eu-central-1) — repositories for images that run
-  in eu-central-1: Django api, Next.js web, and cut_image Lambda.
+  photo-feed ECR (eu-central-1) — repositories for images that run in
+  eu-central-1: Django api, Next.js web, and cut_image Lambda.
   generate_image lives in us-west-2 next to Bedrock; its repo is in the
-  photo-feed-base-ecr-usw2 stack. Lifecycle policy keeps the last 30
-  tagged images and prunes untagged ones after 7 days.
+  photo-feed-ecr-usw2 stack. Lifecycle policy keeps the last 30 tagged
+  images and prunes untagged ones after 7 days.
 
-  Stack name: photo-feed-base-ecr
-  Deploy: aws cloudformation deploy --template-file infra/cf/base/ecr.yaml \
-            --stack-name photo-feed-base-ecr --region eu-central-1
+  Stack name: photo-feed-ecr-euc1
+  Deploy: aws cloudformation deploy --template-file infra/cf/ecr/ecr-euc1.yaml \
+            --stack-name photo-feed-ecr-euc1 --region eu-central-1
 
 
 Resources:

@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  photo-feed S3 (us-west-2) — drafts bucket for AI-generated variants
+  produced by the generate_image Lambda before the user approves one.
+
+  Object key layout:
+    drafts/<user_id>/<job_id>/<i>.png
+        Bedrock SD3 output, 512x512, where i ∈ 0..n-1.
+        Lifecycle: delete after 24 hours.
+        Access: presigned GET only (the Lambda mints URLs after putting
+        objects; Django passes them through to the frontend).
+
+  Lives in us-west-2 because Bedrock SD3 large is in us-west-2. Writing
+  cross-region would waste latency and egress.
+
+  When the user approves a variant, Django copies the file
+  cross-region into photo-feed-uploads/processed/. The original draft
+  stays here until the 24h lifecycle reaps it.
+
+  Stack name: photo-feed-s3-usw2
+  Deploy: aws cloudformation deploy --template-file infra/cf/s3/s3-usw2.yaml \
+            --stack-name photo-feed-s3-usw2 --region us-west-2
+
+
+Resources:
+
+  GeneratedBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: photo-feed-generated-usw2
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      LifecycleConfiguration:
+        Rules:
+          # Drafts are throwaway. The user either approves one (we
+          # cross-region-copy it into photo-feed-uploads) or moves on.
+          # 24 hours keeps the cost negligible and lets users return to
+          # a previous job briefly if they reload.
+          - Id: ExpireDrafts
+            Status: Enabled
+            Prefix: drafts/
+            ExpirationInDays: 1
+          - Id: AbortIncompleteMultipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+
+Outputs:
+
+  GeneratedBucketName:
+    Description: Name of the generated-drafts bucket
+    Value: !Ref GeneratedBucket
+    Export:
+      Name: photo-feed-generated-bucket-name
+
+  GeneratedBucketArn:
+    Description: ARN of the generated-drafts bucket
+    Value: !GetAtt GeneratedBucket.Arn
+    Export:
+      Name: photo-feed-generated-bucket-arn

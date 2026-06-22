@@ -1,0 +1,58 @@
+name: deploy-infra-ecr
+
+# Applies CloudFormation changes to the ECR stacks:
+#   ecr-euc1 (api, web, cut-image) and ecr-usw2 (generate-image)
+#
+# Two regions because generate_image must live next to Bedrock SD3 in
+# us-west-2; the rest live in eu-central-1.
+#
+# Triggered on push to main when anything in infra/cf/ecr/ changes.
+# The two stacks are independent; both run unconditionally.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/cf/ecr/**"
+      - ".github/workflows/deploy-infra-ecr.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: photo-feed-deploy-infra-ecr
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ROLE_ARN: arn:aws:iam::797890596022:role/photo-feed-github-actions-infra
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          # The credentials are good for any region; per-step --region pins it.
+          aws-region: eu-central-1
+
+      - name: Deploy ecr (eu-central-1)
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/ecr/ecr-euc1.yaml \
+            --stack-name photo-feed-ecr-euc1 \
+            --region eu-central-1 \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy ecr (us-west-2)
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/ecr/ecr-usw2.yaml \
+            --stack-name photo-feed-ecr-usw2 \
+            --region us-west-2 \
+            --no-fail-on-empty-changeset

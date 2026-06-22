@@ -1,0 +1,59 @@
+name: deploy-infra-s3
+
+# Applies CloudFormation changes to the S3 bucket stacks:
+#   s3-euc1 (photo-feed-uploads — raw + processed media)
+#   s3-usw2 (photo-feed-generated-usw2 — Bedrock AI drafts)
+#
+# Two regions because the AI drafts bucket lives next to Bedrock SD3 in
+# us-west-2; the uploads bucket lives in eu-central-1 next to the
+# cut_image Lambda.
+#
+# Triggered on push to main when anything in infra/cf/s3/ changes.
+# The two stacks are independent; both run unconditionally.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/cf/s3/**"
+      - ".github/workflows/deploy-infra-s3.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: photo-feed-deploy-infra-s3
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ROLE_ARN: arn:aws:iam::797890596022:role/photo-feed-github-actions-infra
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Deploy s3 (eu-central-1)
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/s3/s3-euc1.yaml \
+            --stack-name photo-feed-s3-euc1 \
+            --region eu-central-1 \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy s3 (us-west-2)
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/s3/s3-usw2.yaml \
+            --stack-name photo-feed-s3-usw2 \
+            --region us-west-2 \
+            --no-fail-on-empty-changeset

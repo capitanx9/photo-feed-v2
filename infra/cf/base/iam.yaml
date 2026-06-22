@@ -289,11 +289,14 @@ Resources:
                 Action:
                   - cloudformation:*
                 Resource:
-                  - !Sub arn:aws:cloudformation:eu-central-1:${AccountId}:stack/photo-feed-base-*/*
-                  - !Sub arn:aws:cloudformation:eu-central-1:${AccountId}:stack/photo-feed-ec2-*/*
-                  # ecr-usw2 lives in us-west-2 (next to Bedrock-bound Lambda).
-                  # Same naming convention (photo-feed-base-*), different region.
-                  - !Sub arn:aws:cloudformation:us-west-2:${AccountId}:stack/photo-feed-base-*/*
+                  # All non-Lambda stacks under the photo-feed-* prefix:
+                  #   photo-feed-base-*   (network, iam, secrets)
+                  #   photo-feed-ecr-*    (per-region ECR)
+                  #   photo-feed-s3-*     (per-region S3)
+                  #   photo-feed-ec2-*    (stage / prod EC2)
+                  # Lambda stacks have their own dedicated role.
+                  - !Sub arn:aws:cloudformation:eu-central-1:${AccountId}:stack/photo-feed-*/*
+                  - !Sub arn:aws:cloudformation:us-west-2:${AccountId}:stack/photo-feed-*/*
               - Effect: Allow
                 Action:
                   - ec2:*
