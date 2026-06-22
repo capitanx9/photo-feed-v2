@@ -82,16 +82,19 @@ jobs:
         run: |
           INSTANCE="${{ steps.ec2.outputs.instance }}"
 
-          # SSM Agent runs as root. Drop privileges to ubuntu (owner of
-          # /srv/photo-feed and member of docker group). -E is blocked
-          # by Ubuntu's default sudoers, so env is passed positionally.
+          # SSM Agent runs commands through /bin/sh (dash on Ubuntu) — dash
+          # doesn't support `set -o pipefail`, so we can't put it in the
+          # shim. apply.sh itself enables `set -euo pipefail` (it's bash),
+          # so the shim only needs to cd + drop privileges to ubuntu (owner
+          # of /srv/photo-feed and member of docker group). `sudo -E` is
+          # blocked by Ubuntu's default sudoers, so env is passed positionally.
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE" \
             --document-name AWS-RunShellScript \
             --comment "deploy-host-stage ${GITHUB_SHA::12}" \
             --parameters '{
               "commands": [
-                "set -euo pipefail",
+                "set -eu",
                 "cd /srv/photo-feed",
                 "sudo -u ubuntu AWS_REGION=${{ env.AWS_REGION }} bash infra/host/apply.sh"
               ],
