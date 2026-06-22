@@ -1,29 +1,27 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
-Description: >
-  photo-feed S3 (eu-central-1) — uploads bucket for raw user uploads and
-  cut_image-resized copies that posts and avatars reference.
+Description: photo-feed S3 (eu-central-1) — uploads bucket (raw/ and processed/).
 
-  Object key prefixes:
-    raw/<user_id>/<media_id>.{jpg,png,...}
-        Just-uploaded file via presigned PUT. Cut by cut_image Lambda.
-        Lifecycle: delete after 7 days (resized copy already exists).
-
-    processed/<user_id>/<media_id>.jpg
-        512x512 JPEG produced by cut_image OR cross-region copy from
-        generated-usw2 drafts/ when an AI variant is approved.
-        Lifecycle: permanent. Access: presigned GET only (no public read).
-
-  CORS: AllowedOrigins covers the stage nip.io fallback and any subdomain
-  on the eventual real domain. PUT-only — the browser uploads raw files
-  directly with the presigned URL Django mints.
-
-  No public-read on processed/. Django mints short-lived presigned GET
-  URLs in serializers (matches v1 behaviour — see PostMediaSerializer.url).
-
-  Stack name: photo-feed-s3-euc1
-  Deploy: aws cloudformation deploy --template-file infra/cf/s3/s3-euc1.yaml \
-            --stack-name photo-feed-s3-euc1 --region eu-central-1
+# Stack name: photo-feed-s3-euc1
+# Deploy: aws cloudformation deploy --template-file infra/cf/s3/s3-euc1.yaml \
+#           --stack-name photo-feed-s3-euc1 --region eu-central-1
+#
+# Object key prefixes:
+#   raw/<user_id>/<media_id>.{jpg,png,...}
+#       Just-uploaded file via presigned PUT. Cut by cut_image Lambda.
+#       Lifecycle: delete after 7 days (resized copy already exists).
+#
+#   processed/<user_id>/<media_id>.jpg
+#       512x512 JPEG produced by cut_image OR cross-region copy from
+#       generated-usw2 drafts/ when an AI variant is approved.
+#       Lifecycle: permanent. Access: presigned GET only (no public read).
+#
+# CORS: AllowedOrigins covers the stage nip.io fallback and any subdomain
+# on the eventual real domain. PUT-only — the browser uploads raw files
+# directly with the presigned URL Django mints.
+#
+# No public-read on processed/. Django mints short-lived presigned GET
+# URLs in serializers (matches v1 behaviour — see PostMediaSerializer.url).
 
 
 Resources:
