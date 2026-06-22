@@ -367,6 +367,18 @@ Resources:
                   - secretsmanager:DescribeSecret
                 Resource:
                   - !Sub arn:aws:secretsmanager:eu-central-1:${AccountId}:secret:/photo-feed/stage/*
+        # apply.sh reads StageDomain from the ec2-stage stack outputs to
+        # render nginx.conf and ALLOWED_HOSTS. Without this, we can't
+        # resolve the domain at runtime.
+        - PolicyName: PhotoFeedInstanceRole-DescribeStacks
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                Resource:
+                  - !Sub arn:aws:cloudformation:eu-central-1:${AccountId}:stack/photo-feed-ec2-*/*
 
   PhotoFeedInstanceProfile:
     Type: AWS::IAM::InstanceProfile
