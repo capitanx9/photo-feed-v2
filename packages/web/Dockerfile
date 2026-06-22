@@ -74,7 +74,13 @@ USER nextjs
 EXPOSE 3000
 
 # server.js is the entrypoint Next generates for the standalone server.
-# It honours HOSTNAME and PORT from env — that's why we pin both above
-# (and reaffirm HOSTNAME in compose to override Docker's container-name
-# default, which would otherwise prevent inbound traffic).
-CMD ["node", "packages/web/server.js"]
+# Next places it at the *root* of the standalone output, even when the
+# app is built from a subdirectory like packages/web — so after copying
+# .next/standalone to /app/, the entrypoint is /app/server.js. Static
+# and public assets still live under packages/web/ because server.js
+# references them by their original build-time path.
+#
+# server.js honours HOSTNAME and PORT from env — that's why we pin both
+# above (and reaffirm HOSTNAME in compose to override Docker's
+# container-name default, which would otherwise prevent inbound traffic).
+CMD ["node", "server.js"]
