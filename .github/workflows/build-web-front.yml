@@ -1,0 +1,135 @@
+name: build-web-front
+
+# Build the web image and push it to ECR, then bump WEB_IMAGE_TAG in
+# infra/host/images.env via the photo-feed-bot-v2 GitHub App.
+#
+# Mirror of build-web-back. Comments live there.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/web/**"
+      - "packages/web/Dockerfile"
+      - ".github/workflows/build-web-front.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: photo-feed-build-web-front
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REGISTRY: 797890596022.dkr.ecr.eu-central-1.amazonaws.com
+  ECR_REPO: photo-feed-web
+  IMAGE_TAG_KEY: WEB_IMAGE_TAG
+  ROLE_ARN: arn:aws:iam::797890596022:role/photo-feed-github-actions-api
+
+jobs:
+  build-and-bump:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Mint photo-feed-bot-v2 token
+        id: bot-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.bot-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: ECR login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute image tag
+        id: tag
+        run: |
+          TAG="${GITHUB_SHA::12}"
+          echo "tag=$TAG"                                   >> "$GITHUB_OUTPUT"
+          echo "uri=${ECR_REGISTRY}/${ECR_REPO}:${TAG}"     >> "$GITHUB_OUTPUT"
+
+      - name: Build + push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/web/Dockerfile
+          push: true
+          tags: ${{ steps.tag.outputs.uri }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Find originating PR number
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.bot-token.outputs.token }}
+        run: |
+          PR="$(gh pr list --search "${GITHUB_SHA}" --state merged \
+                          --json number --jq '.[0].number // empty')"
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+          if [ -n "$PR" ]; then
+            echo "::notice::Build triggered by squashed PR #${PR}"
+          fi
+
+      - name: Bump WEB_IMAGE_TAG in infra/host/images.env
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          FILE=infra/host/images.env
+
+          git config user.name  "photo-feed-bot-v2[bot]"
+          git config user.email "photo-feed-bot-v2[bot]@users.noreply.github.com"
+
+          PR_SUFFIX=""
+          [ -n "$PR" ] && PR_SUFFIX=" (#${PR})"
+          SUBJECT="[deploy] ci(build-web-front): bump WEB_IMAGE_TAG to ${TAG}${PR_SUFFIX}"
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+
+            tmp="$(mktemp)"
+            awk -v new="WEB_IMAGE_TAG=${TAG}" '
+              /^WEB_IMAGE_TAG=/ { print new; next }
+              { print }
+            ' "$FILE" > "$tmp"
+            mv "$tmp" "$FILE"
+
+            if git diff --quiet -- "$FILE"; then
+              echo "No change in $FILE (same tag as before) — skipping commit."
+              exit 0
+            fi
+
+            git add "$FILE"
+            git commit -m "$SUBJECT" \
+                       -m "Triggered by: ${PR:+#${PR}}" \
+                       -m "Image: ${ECR_REPO}:${TAG}"
+
+            if git push origin HEAD:main; then
+              echo "::notice::Bumped WEB_IMAGE_TAG to ${TAG}${PR_SUFFIX}"
+              exit 0
+            fi
+
+            echo "push attempt $attempt failed (main moved); resetting and retrying..."
+            sleep $((attempt * 2))
+          done
+
+          echo "::error::could not push bump after 5 attempts"
+          exit 1
