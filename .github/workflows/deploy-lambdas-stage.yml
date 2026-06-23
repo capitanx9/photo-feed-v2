@@ -1,0 +1,130 @@
+name: deploy-lambdas-stage
+
+# Apply CloudFormation for the two Lambda stacks:
+#   photo-feed-lambdas-euc1 (cut_image)   in eu-central-1
+#   photo-feed-lambdas-usw2 (generate_image) in us-west-2
+#
+# Two trigger modes:
+#   1. workflow_run from build-cut-image / build-generate-image (success).
+#      The build workflow has already bumped CUT_IMAGE_TAG /
+#      GENERATE_IMAGE_TAG in infra/cf/lambdas/images.env; we just need
+#      to roll the stacks forward.
+#   2. push to main when anything in infra/cf/lambdas/** changes (e.g.
+#      template tweak, role policy change).
+#
+# Two parallel jobs — one per region — both read images.env for their tag.
+# Each job ends with a smoke `aws lambda invoke` to prove the function
+# is alive on the new image.
+
+on:
+  workflow_run:
+    workflows: ["build-cut-image", "build-generate-image"]
+    types: [completed]
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "infra/cf/lambdas/**"
+      - ".github/workflows/deploy-lambdas-stage.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: photo-feed-deploy-lambdas-stage
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ROLE_ARN: arn:aws:iam::797890596022:role/photo-feed-github-actions-lambdas
+
+jobs:
+
+  deploy-cut-image:
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Read CUT_IMAGE_TAG
+        id: tag
+        run: |
+          # shellcheck disable=SC1091
+          source infra/cf/lambdas/images.env
+          echo "tag=${CUT_IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Deploying cut_image with CUT_IMAGE_TAG=${CUT_IMAGE_TAG}"
+
+      - name: Deploy lambdas/euc1 stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/lambdas/euc1.yaml \
+            --stack-name photo-feed-lambdas-euc1 \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region eu-central-1 \
+            --parameter-overrides "CutImageImageTag=${{ steps.tag.outputs.tag }}" \
+            --no-fail-on-empty-changeset
+
+      - name: Smoke invoke
+        run: |
+          out="$(aws lambda invoke \
+            --function-name photo-feed-cut-image-stage \
+            --region eu-central-1 \
+            --cli-binary-format raw-in-base64-out \
+            --payload '{}' \
+            /tmp/cut-image-response.json)"
+          echo "$out"
+          cat /tmp/cut-image-response.json
+          echo
+          grep -q '"ok": true' /tmp/cut-image-response.json
+          echo "::notice::cut_image smoke OK"
+
+  deploy-generate-image:
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Read GENERATE_IMAGE_TAG
+        id: tag
+        run: |
+          # shellcheck disable=SC1091
+          source infra/cf/lambdas/images.env
+          echo "tag=${GENERATE_IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Deploying generate_image with GENERATE_IMAGE_TAG=${GENERATE_IMAGE_TAG}"
+
+      - name: Deploy lambdas/usw2 stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/lambdas/usw2.yaml \
+            --stack-name photo-feed-lambdas-usw2 \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region us-west-2 \
+            --parameter-overrides "GenerateImageImageTag=${{ steps.tag.outputs.tag }}" \
+            --no-fail-on-empty-changeset
+
+      - name: Smoke invoke
+        run: |
+          out="$(aws lambda invoke \
+            --function-name photo-feed-generate-image-stage \
+            --region us-west-2 \
+            --cli-binary-format raw-in-base64-out \
+            --payload '{}' \
+            /tmp/generate-image-response.json)"
+          echo "$out"
+          cat /tmp/generate-image-response.json
+          echo
+          grep -q '"ok": true' /tmp/generate-image-response.json
+          echo "::notice::generate_image smoke OK"

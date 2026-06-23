@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: photo-feed Lambdas (eu-central-1) — cut_image function.
+
+# Stack name: photo-feed-lambdas-euc1
+# Deploy: aws cloudformation deploy --template-file infra/cf/lambdas/euc1.yaml \
+#           --stack-name photo-feed-lambdas-euc1 --capabilities CAPABILITY_IAM \
+#           --region eu-central-1 \
+#           --parameter-overrides CutImageImageTag=<sha12>
+#
+# cut_image consumes S3 PutObject events from photo-feed-uploads on the raw/
+# prefix (wired in Phase 6 once a real handler exists — the Phase 5 stub just
+# echoes {"ok": true}).
+#
+# Image URI is composed from the ECR repo (photo-feed-cut-image) + the tag
+# bumped into infra/cf/lambdas/images.env by the build-cut-image workflow.
+
+Parameters:
+
+  AccountId:
+    Type: String
+    Default: "797890596022"
+
+  CutImageImageTag:
+    Type: String
+    Description: SHA12 tag of the cut_image image to deploy.
+
+Resources:
+
+  CutImageExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: photo-feed-lambdas-cut-image
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        # Stub doesn't actually need these yet — but baking them in now
+        # so the real handler in Phase 6 needs zero IAM changes.
+        - PolicyName: S3RawAndProcessed
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: arn:aws:s3:::photo-feed-uploads/raw/*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: arn:aws:s3:::photo-feed-uploads/processed/*
+        - PolicyName: SecretsManagerWebhookSecret
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub arn:aws:secretsmanager:eu-central-1:${AccountId}:secret:/photo-feed/stage/WEBHOOK_SHARED_SECRET-*
+
+  CutImageFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: photo-feed-cut-image-stage
+      PackageType: Image
+      Code:
+        ImageUri: !Sub ${AccountId}.dkr.ecr.eu-central-1.amazonaws.com/photo-feed-cut-image:${CutImageImageTag}
+      Role: !GetAtt CutImageExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 1024
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          MEDIA_WEBHOOK_SECRET_ARN: !Sub arn:aws:secretsmanager:eu-central-1:${AccountId}:secret:/photo-feed/stage/WEBHOOK_SHARED_SECRET
+
+Outputs:
+
+  CutImageFunctionArn:
+    Value: !GetAtt CutImageFunction.Arn
+    Export:
+      Name: photo-feed-cut-image-fn-arn
+
+  CutImageFunctionName:
+    Value: !Ref CutImageFunction
+    Export:
+      Name: photo-feed-cut-image-fn-name
