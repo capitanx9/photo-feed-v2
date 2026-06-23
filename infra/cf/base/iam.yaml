@@ -338,6 +338,29 @@ Resources:
                   - s3:ListBucket
                 Resource:
                   - arn:aws:s3:::photo-feed-*
+              # Secrets Manager admin for the photo-feed-base-secrets stack.
+              # GenerateSecretString in CF dispatches GetRandomPassword which
+              # is account-scoped (no per-secret ARN exists at call time).
+              # Per-secret mutations are scoped to /photo-feed/*.
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetRandomPassword
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:DeleteSecret
+                  - secretsmanager:UpdateSecret
+                  - secretsmanager:TagResource
+                  - secretsmanager:UntagResource
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:PutResourcePolicy
+                  - secretsmanager:DeleteResourcePolicy
+                  - secretsmanager:GetResourcePolicy
+                Resource:
+                  - !Sub arn:aws:secretsmanager:eu-central-1:${AccountId}:secret:/photo-feed/*
               - Effect: Allow
                 Action:
                   - iam:*
