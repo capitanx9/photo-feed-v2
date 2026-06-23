@@ -321,7 +321,7 @@ Resources:
                   - s3:DeleteBucket
                   - s3:PutBucketTagging
                   - s3:PutBucketCORS
-                  - s3:PutBucketLifecycleConfiguration
+                  - s3:PutLifecycleConfiguration
                   - s3:PutBucketPolicy
                   - s3:DeleteBucketPolicy
                   - s3:PutBucketPublicAccessBlock
