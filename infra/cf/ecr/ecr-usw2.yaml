@@ -27,6 +27,19 @@ Resources:
       ImageScanningConfiguration:
         ScanOnPush: true
       ImageTagMutability: MUTABLE
+      # Allow the Lambda service to pull this image when CF creates the
+      # function in photo-feed-lambdas-usw2. Without this Lambda gets
+      # AccessDenied at function-creation time.
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: LambdaECRImageRetrievalPolicy
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
       LifecyclePolicy:
         LifecyclePolicyText: |
           {
