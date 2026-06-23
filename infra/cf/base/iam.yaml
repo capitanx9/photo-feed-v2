@@ -221,6 +221,11 @@ Resources:
                   - iam:PutRolePolicy
                   - iam:DeleteRolePolicy
                   - iam:GetRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListRoleTags
                 Resource:
                   - !Sub arn:aws:iam::${AccountId}:role/photo-feed-lambdas-*
               - Effect: Allow

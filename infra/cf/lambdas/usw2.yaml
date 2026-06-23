@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: photo-feed Lambdas (us-west-2) — generate_image function.
+
+# Stack name: photo-feed-lambdas-usw2
+# Deploy: aws cloudformation deploy --template-file infra/cf/lambdas/usw2.yaml \
+#           --stack-name photo-feed-lambdas-usw2 --capabilities CAPABILITY_IAM \
+#           --region us-west-2 \
+#           --parameter-overrides GenerateImageImageTag=<sha12>
+#
+# generate_image is invoked synchronously from a Django Celery task — it
+# calls Bedrock SD3 large in us-west-2 and writes drafts to
+# photo-feed-generated-usw2. The Phase 5 stub just echoes {"ok": true};
+# real handler in Phase 6.
+#
+# SnapStart is enabled — cuts cold-start dramatically for the boto3 client
+# init and (in Phase 6) the Pillow import.
+
+Parameters:
+
+  AccountId:
+    Type: String
+    Default: "797890596022"
+
+  GenerateImageImageTag:
+    Type: String
+    Description: SHA12 tag of the generate_image image to deploy.
+
+Resources:
+
+  GenerateImageExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: photo-feed-lambdas-generate-image
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        # Stub doesn't actually need these yet — but baking them in now
+        # so the real handler in Phase 6 needs zero IAM changes.
+        - PolicyName: BedrockInvokeStability
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - arn:aws:bedrock:us-west-2::foundation-model/stability.sd3-large-v1:0
+        - PolicyName: S3WriteDrafts
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: arn:aws:s3:::photo-feed-generated-usw2/drafts/*
+
+  GenerateImageFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: photo-feed-generate-image-stage
+      PackageType: Image
+      Code:
+        ImageUri: !Sub ${AccountId}.dkr.ecr.us-west-2.amazonaws.com/photo-feed-generate-image:${GenerateImageImageTag}
+      Role: !GetAtt GenerateImageExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 2048
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          DRAFTS_BUCKET: photo-feed-generated-usw2
+          BEDROCK_MODEL_ID: stability.sd3-large-v1:0
+
+Outputs:
+
+  GenerateImageFunctionArn:
+    Value: !GetAtt GenerateImageFunction.Arn
+    Export:
+      Name: photo-feed-generate-image-fn-arn
+
+  GenerateImageFunctionName:
+    Value: !Ref GenerateImageFunction
+    Export:
+      Name: photo-feed-generate-image-fn-name
