@@ -119,6 +119,8 @@ Resources:
           Value: photo-feed
         - Key: Environment
           Value: stage
+        - Key: ManagedBy
+          Value: cloudformation
       UserData:
         # Thin wrapper around bootstrap.sh: export CF pseudo-parameters
         # and the repo URL as env vars (because the .sh file is plain
