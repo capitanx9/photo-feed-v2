@@ -1,6 +1,10 @@
 line-length = 100
 target-version = "py312"
 
+# Django-generated migrations follow Django's own style, not ours — leave
+# them alone so `makemigrations` output doesn't churn on lint.
+extend-exclude = ["**/migrations/**"]
+
 [lint]
 select = [
   "E",   # pycodestyle errors
