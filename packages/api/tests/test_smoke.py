@@ -10,6 +10,7 @@ django.setup()
 def test_imports() -> None:
     import api  # noqa: F401
     import common  # noqa: F401
+    import users  # noqa: F401
 
 
 @pytest.fixture

@@ -69,7 +69,10 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "drf_spectacular",
+    "users",
 ]
+
+AUTH_USER_MODEL = "users.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -105,27 +108,20 @@ WSGI_APPLICATION = "api.wsgi.application"
 # Database
 # ----------------------------------------------------------------------
 
-# If POSTGRES_HOST is set, we're in compose with the postgres service.
-# Otherwise (plain `python manage.py runserver`), fall back to sqlite —
-# zero-setup for local development.
-if os.environ.get("POSTGRES_HOST"):
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "HOST": env("POSTGRES_HOST"),
-            "PORT": env("POSTGRES_PORT", "5432"),
-            "NAME": env("POSTGRES_DB", "api"),
-            "USER": env("POSTGRES_USER", "api"),
-            "PASSWORD": env("POSTGRES_PASSWORD"),
-        }
+# Postgres everywhere — stage/prod via compose, local dev via the same
+# compose stack. No sqlite fallback: it diverged from production
+# behaviour (text/JSON field semantics, case sensitivity, etc.) and
+# leaked a db.sqlite3 file into src/ on every accidental migrate.
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "HOST": env("POSTGRES_HOST", "localhost"),
+        "PORT": env("POSTGRES_PORT", "5432"),
+        "NAME": env("POSTGRES_DB", "api"),
+        "USER": env("POSTGRES_USER", "api"),
+        "PASSWORD": env("POSTGRES_PASSWORD", "api"),
     }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+}
 
 
 # ----------------------------------------------------------------------
