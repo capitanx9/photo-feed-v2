@@ -347,6 +347,12 @@ wheels = [
 name = "generate-image"
 version = "0.1.0"
 source = { editable = "packages/generate_image" }
+dependencies = [
+    { name = "boto3" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "boto3", specifier = ">=1.43" }]
 
 [[package]]
 name = "gunicorn"
