@@ -34,11 +34,16 @@ Parameters:
     Description: EC2 key pair name (must exist in this region beforehand).
 
   UbuntuAMI:
-    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Type: AWS::EC2::Image::Id
+    Default: ami-08ea642491f096f83
     Description: >
-      Latest Ubuntu 24.04 AMI ID. Resolved at deploy time from the public
-      SSM parameter Canonical publishes — no hardcoded AMI that goes stale.
+      Pinned Ubuntu 24.04 AMI ID (eu-central-1). We deliberately do NOT
+      resolve this from /aws/service/canonical/.../current — Canonical
+      publishes a new AMI every few days, and an SSM::Parameter::Value
+      lookup makes every stack UPDATE see a new ImageId, which forces
+      CloudFormation to replace the EC2 instance and silently wipe the
+      compose volumes (Postgres data, certbot data). Bump this default
+      deliberately when we want to refresh the AMI.
 
   GitHubRepoUrl:
     Type: String
