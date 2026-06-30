@@ -6,15 +6,20 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import PostMedia
+from .models import Post, PostMedia
+from .pagination import PostsCursorPagination
 from .serializers import (
     MediaProcessedSerializer,
+    PostCreateSerializer,
     PostMediaSerializer,
+    PostSerializer,
     UploadURLRequestSerializer,
     UploadURLResponseSerializer,
 )
@@ -110,3 +115,129 @@ def media_processed(request: Request) -> Response:
     media.status = serializer.validated_data["status"]
     media.save(update_fields=["s3_key_resized", "status"])
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PostListCreateView(APIView):
+    """GET = public feed (cursor-paginated published posts).
+    POST = authenticated user creates a post from media they already uploaded."""
+
+    @posts_schema(
+        summary="List published posts (feed)",
+        description="Cursor-paginated feed of all published posts. Public.",
+        request=None,
+        responses={200: PostSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        qs = (
+            Post.objects.filter(status=Post.Status.PUBLISHED)
+            .select_related("owner")
+            .prefetch_related("media")
+        )
+        paginator = PostsCursorPagination()
+        page = paginator.paginate_queryset(qs, request, view=self)
+        return paginator.get_paginated_response(PostSerializer(page, many=True).data)
+
+    @posts_schema(
+        summary="Create a post",
+        description=(
+            "Attach already-uploaded, owner-owned, post-less PostMedia to a new Post. "
+            "media_ids must be non-empty; every id must belong to the authenticated user "
+            "and not already be attached to another post."
+        ),
+        request=PostCreateSerializer,
+        responses={201: PostSerializer, 400: ERROR_400, 401: ERROR_401},
+    )
+    def post(self, request: Request) -> Response:
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED
+            )
+        serializer = PostCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        media_ids = serializer.validated_data["media_ids"]
+        media_qs = PostMedia.objects.filter(
+            pk__in=media_ids,
+            owner=request.user,
+            post__isnull=True,
+        )
+        if media_qs.count() != len(set(media_ids)):
+            return Response(
+                {"detail": "media_ids contain unknown, foreign, or already-attached media"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        post = Post.objects.create(
+            owner=request.user,
+            caption=serializer.validated_data.get("caption", ""),
+            price=serializer.validated_data.get("price"),
+            status=Post.Status.PUBLISHED,
+        )
+        media_qs.update(post=post)
+        return Response(PostSerializer(post).data, status=status.HTTP_201_CREATED)
+
+
+class PostDetailView(RetrieveUpdateDestroyAPIView):
+    queryset = Post.objects.all().select_related("owner").prefetch_related("media")
+    serializer_class = PostSerializer
+
+    def get_permissions(self):  # type: ignore[no-untyped-def]
+        if self.request.method in ("GET", "HEAD"):
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def get_object(self) -> Post:  # type: ignore[override]
+        obj: Post = get_object_or_404(self.get_queryset(), pk=self.kwargs["pk"])
+        if self.request.method not in ("GET", "HEAD") and obj.owner_id != self.request.user.id:
+            raise PermissionDenied("Not your post")
+        return obj
+
+    @posts_schema(
+        summary="Retrieve a post",
+        description="Public read of one post including its media.",
+        request=None,
+        responses={200: PostSerializer, 404: ERROR_404},
+    )
+    def get(self, request: Request, *args, **kwargs):  # type: ignore[no-untyped-def, override]
+        return super().get(request, *args, **kwargs)
+
+    @posts_schema(
+        summary="Update a post",
+        description="Owner-only patch of caption and/or price.",
+        request=PostSerializer,
+        responses={200: PostSerializer, 400: ERROR_400, 401: ERROR_401, 404: ERROR_404},
+    )
+    def patch(self, request: Request, *args, **kwargs):  # type: ignore[no-untyped-def, override]
+        return super().patch(request, *args, **kwargs)
+
+    @posts_schema(
+        summary="Delete a post",
+        description="Owner-only. Cascades to PostMedia rows for this post.",
+        request=None,
+        responses={204: None, 401: ERROR_401, 404: ERROR_404},
+    )
+    def delete(self, request: Request, *args, **kwargs):  # type: ignore[no-untyped-def, override]
+        return super().delete(request, *args, **kwargs)
+
+
+class UserPostsView(ListAPIView):
+    serializer_class = PostSerializer
+    pagination_class = PostsCursorPagination
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):  # type: ignore[no-untyped-def, override]
+        return (
+            Post.objects.filter(
+                owner_id=self.kwargs["pk"],
+                status=Post.Status.PUBLISHED,
+            )
+            .select_related("owner")
+            .prefetch_related("media")
+        )
+
+    @posts_schema(
+        summary="List a user's published posts",
+        description="Cursor-paginated public list of published posts by user id.",
+        request=None,
+        responses={200: PostSerializer(many=True)},
+    )
+    def get(self, request: Request, *args, **kwargs):  # type: ignore[no-untyped-def, override]
+        return super().get(request, *args, **kwargs)
