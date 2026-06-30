@@ -25,6 +25,11 @@ Parameters:
     Type: String
     Description: SHA12 tag of the cut_image image to deploy.
 
+  ApiBaseUrl:
+    Type: String
+    Default: https://stage.photo-feed.click
+    Description: Base URL Django exposes /internal/media/processed/ on.
+
 Resources:
 
   CutImageExecutionRole:
@@ -80,6 +85,21 @@ Resources:
       Environment:
         Variables:
           MEDIA_WEBHOOK_SECRET_ARN: !Sub arn:aws:secretsmanager:eu-central-1:${AccountId}:secret:/photo-feed/stage/WEBHOOK_SHARED_SECRET
+          API_BASE_URL: !Ref ApiBaseUrl
+
+  # Lets S3 invoke the Lambda — required *before* the bucket notification
+  # is created. The bucket notification lives in the s3-euc1 stack;
+  # because it points at this function ARN by ImportValue, that stack
+  # will fail to update until this permission exists. Permission itself
+  # carries no runtime cost.
+  CutImageInvokePermissionForS3:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CutImageFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AccountId
+      SourceArn: arn:aws:s3:::photo-feed-uploads
 
 Outputs:
 
