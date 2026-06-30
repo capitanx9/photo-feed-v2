@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "users",
     "posts",
+    "orders",
     "ai",
 ]
 
