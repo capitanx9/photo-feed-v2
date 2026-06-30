@@ -11,12 +11,13 @@ Description: >
             --stack-name photo-feed-ec2-stage --capabilities CAPABILITY_IAM \
             --region eu-central-1
 
-  After first deploy: no DNS step needed — `<ip>.nip.io` resolves to the
-  Elastic IP automatically. The StageDomain output prints the exact hostname.
+  StageDomain output is hardcoded to stage.photo-feed.click. The Route 53
+  hosted zone for photo-feed.click and the A-record pointing
+  stage.photo-feed.click at the Elastic IP live outside this stack for now;
+  a follow-up PR will codify them in infra/cf/dns/. apply.sh, the nginx
+  template, and compose all read STAGE_DOMAIN dynamically from this output.
   Bootstrap the cert by running certbot once via SSM (see runbook in
-  docs/runbooks/). When we move to a real Route 53 domain later, only the
-  StageDomain output (and dns.yaml) needs to change — apply.sh, nginx
-  template, and compose all read STAGE_DOMAIN dynamically.
+  docs/runbooks/).
 
 
 Parameters:
@@ -153,15 +154,11 @@ Outputs:
 
   StageDomain:
     Description: >
-      Stage hostname. While we wait for a proper Route 53 domain, we use
-      nip.io — a free wildcard-DNS service that maps `<ip>.nip.io` to
-      `<ip>` for any IP. Let's Encrypt supports nip.io subdomains, so
-      HTTPS works out of the box.
-    Value: !Sub
-      - ${IpDashed}.nip.io
-      # nip.io accepts both dot and dash forms; dash is friendlier in
-      # URLs and certificate CN displays.
-      - IpDashed: !Join ["-", !Split [".", !Ref StageEIP]]
+      Stage hostname. Points at the Route 53 A-record
+      stage.photo-feed.click → StageEIP (record managed outside this stack
+      until dns.yaml lands). apply.sh reads this output and feeds it to
+      the nginx template + compose env.
+    Value: stage.photo-feed.click
     Export:
       Name: photo-feed-stage-domain
 
