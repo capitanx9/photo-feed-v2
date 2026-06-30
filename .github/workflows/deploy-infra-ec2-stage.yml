@@ -49,13 +49,21 @@ jobs:
           # Pass bootstrap.sh content as a CloudFormation parameter.
           # CF Parameters max 4096 bytes — current bootstrap is ~3 KB.
           BOOTSTRAP_BODY="$(cat infra/cf/ec2/bootstrap.sh)"
+          # Read the pinned AMI from the template default. Without this
+          # override CloudFormation reuses the previous stack value, which
+          # for stacks first deployed under the old SSM::Parameter::Value
+          # type is the literal SSM path string — and that fails to
+          # validate against the new AWS::EC2::Image::Id type. Passing the
+          # template default makes the first UPDATE after the type swap
+          # succeed without forcing a replacement.
+          PINNED_AMI=$(awk '/^  UbuntuAMI:/{flag=1} flag && /^    Default:/{print $2; exit}' infra/cf/ec2/ec2-stage.yaml)
           aws cloudformation deploy \
             --template-file infra/cf/ec2/ec2-stage.yaml \
             --stack-name "${STACK_NAME}" \
             --capabilities CAPABILITY_IAM \
             --region "${AWS_REGION}" \
             --no-fail-on-empty-changeset \
-            --parameter-overrides "BootstrapScript=${BOOTSTRAP_BODY}"
+            --parameter-overrides "BootstrapScript=${BOOTSTRAP_BODY}" "UbuntuAMI=${PINNED_AMI}"
 
       - name: Report Elastic IP and stage domain
         # nip.io maps `<ip>.nip.io` → `<ip>` automatically. No DNS step
