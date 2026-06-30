@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
@@ -138,6 +139,15 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "photo-feed API",
+    "VERSION": "0.1.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SORT_OPERATIONS": False,
 }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -171,6 +181,48 @@ CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", [])
 
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
+
+
+# ----------------------------------------------------------------------
+# S3 / uploads
+# ----------------------------------------------------------------------
+
+AWS_REGION = env("AWS_REGION", "eu-central-1")
+S3_UPLOADS_BUCKET = env("S3_UPLOADS_BUCKET", "photo-feed-uploads")
+S3_PRESIGN_TTL_SECONDS = int(env("S3_PRESIGN_TTL_SECONDS", "300"))
+UPLOAD_MAX_BYTES = int(env("UPLOAD_MAX_BYTES", str(10 * 1024 * 1024)))
+UPLOAD_ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"]
+
+# Optional MinIO override for local dev; in stage/prod both are unset
+# and boto3 talks to the real AWS endpoint. The presign helpers in
+# common/s3.py only swap clients when these are non-empty.
+AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", "")
+AWS_S3_PUBLIC_ENDPOINT_URL = env("AWS_S3_PUBLIC_ENDPOINT_URL", "")
+
+# Shared secret used by cut_image lambda when calling /internal/media/processed/
+WEBHOOK_SHARED_SECRET = env("WEBHOOK_SHARED_SECRET", "local-dev-secret")
+
+
+# ----------------------------------------------------------------------
+# AI / Bedrock image generation (us-west-2)
+# ----------------------------------------------------------------------
+
+BEDROCK_REGION = env("BEDROCK_REGION", "us-west-2")
+GENERATE_IMAGE_LAMBDA_NAME = env("GENERATE_IMAGE_LAMBDA_NAME", "photo-feed-generate-image-stage")
+S3_GENERATED_BUCKET = env("S3_GENERATED_BUCKET", "photo-feed-generated-usw2")
+S3_GENERATED_REGION = env("S3_GENERATED_REGION", "us-west-2")
+
+AI_RATE_LIMIT_PER_HOUR = int(env("AI_RATE_LIMIT_PER_HOUR", "10"))
+AI_MAX_VARIANTS = 4
+AI_ALLOWED_ASPECT_RATIOS = ["1:1", "4:5", "16:9"]
+
+
+# ----------------------------------------------------------------------
+# Rate limiting (common/ratelimit.py)
+# ----------------------------------------------------------------------
+
+RATELIMIT_ENABLE = env_bool("RATELIMIT_ENABLE", default=True)
+REDIS_URL = env("REDIS_URL", "redis://localhost:6379/2")
 
 
 # ----------------------------------------------------------------------
