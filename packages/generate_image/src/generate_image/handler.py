@@ -145,4 +145,9 @@ async def _handler_async(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def handler(event: dict, context: object) -> dict:
+    # Empty payload = deploy-stage smoke ping. Return a cheap shape that
+    # the workflow can grep for without spending Bedrock quota on every
+    # deploy. Any real invocation carries job_id/prompt and falls through.
+    if not event or set(event.keys()) <= {"ping"}:
+        return {"ok": True, "from": "generate_image"}
     return asyncio.run(_handler_async(event))
