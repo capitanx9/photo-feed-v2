@@ -7,9 +7,10 @@
 #
 # Services:
 #   web         Django + gunicorn (api + admin)
+#   web-worker  Celery worker (ai.generate_image and friends)
 #   web-front   Next.js (App Router)
 #   db          postgres
-#   redis       redis (cache + celery broker when we wire it up)
+#   redis       redis (Django cache + Celery broker)
 #   nginx       routes /api/, /admin/, /static/, /media/, /internal/
 #               to web; everything else to web-front
 #   certbot     Let's Encrypt renewal loop
@@ -46,6 +47,7 @@ services:
       S3_GENERATED_BUCKET: photo-feed-generated-usw2
       S3_GENERATED_REGION: us-west-2
       BEDROCK_REGION: us-west-2
+      GENERATE_IMAGE_LAMBDA_NAME: photo-feed-generate-image-stage
       AWS_S3_ENDPOINT_URL: ""
       AWS_S3_PUBLIC_ENDPOINT_URL: ""
     command:
@@ -55,6 +57,45 @@ services:
       - --access-logfile=-
       - --error-logfile=-
       - api.wsgi:application
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web-worker:
+    # Same image as `web`; runs Celery instead of gunicorn. Reads the
+    # same env (DB, Redis, S3, Bedrock) so tasks can hit the DB and
+    # invoke the generate_image Lambda via boto3.
+    image: ${ECR_REGISTRY}/photo-feed-api:${API_IMAGE_TAG}
+    restart: unless-stopped
+    environment:
+      DJANGO_DEBUG: "0"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: api
+      POSTGRES_USER: api
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      WEBHOOK_SHARED_SECRET: ${WEBHOOK_SHARED_SECRET}
+      AWS_REGION: eu-central-1
+      S3_UPLOADS_BUCKET: photo-feed-uploads
+      S3_GENERATED_BUCKET: photo-feed-generated-usw2
+      S3_GENERATED_REGION: us-west-2
+      BEDROCK_REGION: us-west-2
+      GENERATE_IMAGE_LAMBDA_NAME: photo-feed-generate-image-stage
+      AWS_S3_ENDPOINT_URL: ""
+      AWS_S3_PUBLIC_ENDPOINT_URL: ""
+    command:
+      - celery
+      - -A
+      - api.celery_app
+      - worker
+      - --loglevel=info
+      - --concurrency=2
     depends_on:
       db:
         condition: service_healthy
