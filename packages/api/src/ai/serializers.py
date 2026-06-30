@@ -19,6 +19,10 @@ class GenerationCreateResponseSerializer(serializers.Serializer):
     status_url = serializers.CharField()
 
 
+class ApproveRequestSerializer(serializers.Serializer):
+    variant_index = serializers.IntegerField(min_value=0)
+
+
 class GenerationJobSerializer(serializers.ModelSerializer):
     image_urls = serializers.SerializerMethodField()
 

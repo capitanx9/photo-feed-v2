@@ -1,8 +1,11 @@
 from common.ratelimit import allow as ratelimit_allow
+from common.s3 import copy_generated_to_uploads, make_approved_key
 from common.schema import ERROR_400, ERROR_401, ERROR_404, ERROR_429, ai_schema
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
+from posts.models import PostMedia
+from posts.serializers import PostMediaSerializer
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -12,6 +15,7 @@ from rest_framework.views import APIView
 from .models import GenerationJob
 from .serializers import (
     FIXED_ASPECT_RATIO,
+    ApproveRequestSerializer,
     GenerationCreateResponseSerializer,
     GenerationCreateSerializer,
     GenerationJobSerializer,
@@ -83,3 +87,53 @@ class JobDetailView(APIView):
     def get(self, request: Request, pk: int) -> Response:
         job = get_object_or_404(GenerationJob, pk=pk, user=request.user)
         return Response(GenerationJobSerializer(job).data)
+
+
+class ApproveView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @ai_schema(
+        summary="Approve an AI variant into a PostMedia",
+        description=(
+            "Picks one variant from a ready GenerationJob and materialises it as a "
+            "READY PostMedia owned by the caller. Server-side cross-region S3 copy "
+            "moves the PNG from the drafts bucket (us-west-2) into the uploads bucket "
+            "(eu-central-1) under processed/ai/. The returned PostMedia can be passed "
+            "in media_ids to POST /api/posts/ to publish. Calling again with the same "
+            "or different variant_index produces another PostMedia — the job stays "
+            "ready and approving is not exclusive."
+        ),
+        request=ApproveRequestSerializer,
+        responses={
+            201: PostMediaSerializer,
+            400: ERROR_400,
+            401: ERROR_401,
+            404: ERROR_404,
+        },
+    )
+    def post(self, request: Request, pk: int) -> Response:
+        job = get_object_or_404(GenerationJob, pk=pk, user=request.user)
+        if job.status != GenerationJob.Status.READY:
+            return Response(
+                {"detail": f"Job is {job.status}, not ready"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = ApproveRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        index = serializer.validated_data["variant_index"]
+        if index >= len(job.image_keys):
+            return Response(
+                {"detail": f"variant_index {index} out of range (have {len(job.image_keys)})"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        src_key = job.image_keys[index]
+        dst_key = make_approved_key(user_id=request.user.id)
+        copy_generated_to_uploads(src_key=src_key, dst_key=dst_key)
+        media = PostMedia.objects.create(
+            owner=request.user,
+            kind=PostMedia.Kind.POST,
+            s3_key_raw=dst_key,
+            s3_key_resized=dst_key,
+            status=PostMedia.Status.READY,
+        )
+        return Response(PostMediaSerializer(media).data, status=status.HTTP_201_CREATED)
