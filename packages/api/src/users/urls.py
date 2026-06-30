@@ -1,4 +1,5 @@
 from django.urls import path
+from posts.views import UserPostsView
 
 from .views import LoginView, LogoutView, MeView, PublicUserView, RefreshView, RegisterView
 
@@ -13,4 +14,5 @@ auth_urlpatterns = [
 
 users_urlpatterns = [
     path("<int:pk>/", PublicUserView.as_view(), name="user-detail"),
+    path("<int:pk>/posts/", UserPostsView.as_view(), name="user-posts"),
 ]
