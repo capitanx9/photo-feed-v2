@@ -33,6 +33,18 @@ class User(AbstractUser):
     username = None  # type: ignore[assignment]
     email = models.EmailField(unique=True)
 
+    # The avatar is a PostMedia (kind=AVATAR) the user uploaded through
+    # the same /api/posts/upload-url/ flow as post images. SET_NULL on
+    # delete so removing the media row leaves the user intact instead
+    # of cascading the delete.
+    avatar_media = models.ForeignKey(
+        "posts.PostMedia",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS: list[str] = []
 
