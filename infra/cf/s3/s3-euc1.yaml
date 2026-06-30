@@ -30,6 +30,20 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: photo-feed-uploads
+      NotificationConfiguration:
+        LambdaConfigurations:
+          # PutObject on raw/* triggers the cut_image Lambda. The
+          # invoke-permission for s3.amazonaws.com is created in the
+          # lambdas-euc1 stack and must exist before this stack updates;
+          # CloudFormation does not enforce that order across stacks, but
+          # in practice lambdas-euc1 is always deployed first.
+          - Event: s3:ObjectCreated:*
+            Function: !ImportValue photo-feed-cut-image-fn-arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: raw/
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
