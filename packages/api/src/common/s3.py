@@ -81,6 +81,25 @@ def make_download_presign_for_generated(*, key: str) -> str:
     return url
 
 
+def make_approved_key(user_id: int) -> str:
+    return f"processed/ai/{user_id}/{uuid.uuid4().hex}.png"
+
+
+def copy_generated_to_uploads(*, src_key: str, dst_key: str) -> None:
+    """Copy a draft PNG from the generated bucket (us-west-2) into the
+    uploads bucket (eu-central-1). The destination client is region-pinned
+    to uploads; boto3 issues a server-side CopyObject which S3 routes
+    cross-region. ContentType is fixed to image/png — generate_image
+    Lambda only produces PNGs."""
+    get_s3_client().copy_object(
+        Bucket=settings.S3_UPLOADS_BUCKET,
+        Key=dst_key,
+        CopySource={"Bucket": settings.S3_GENERATED_BUCKET, "Key": src_key},
+        MetadataDirective="REPLACE",
+        ContentType="image/png",
+    )
+
+
 EXT_BY_MIME = {
     "image/jpeg": "jpg",
     "image/png": "png",

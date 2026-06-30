@@ -443,6 +443,14 @@ Resources:
                 Effect: Allow
                 Action: s3:ListBucket
                 Resource: arn:aws:s3:::photo-feed-uploads
+              # Read access to the generated/drafts bucket in us-west-2 so
+              # the approve endpoint can server-side CopyObject draft PNGs
+              # cross-region into photo-feed-uploads/processed/ai/.
+              - Sid: PhotoFeedGeneratedRead
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: arn:aws:s3:::photo-feed-generated-usw2/*
         - PolicyName: PhotoFeedInstanceRole-SecretsManagerStage
           PolicyDocument:
             Version: "2012-10-17"
