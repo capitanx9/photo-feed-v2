@@ -24,3 +24,12 @@ ignore = [
 [format]
 quote-style = "double"
 indent-style = "space"
+
+[lint.per-file-ignores]
+# Django/DRF idiom: class-level mutable attrs (Meta.fields, permission_classes,
+# authentication_classes, serializer_class, etc.) are part of the framework
+# contract — not user-mutated state. RUF012 misfires here.
+"**/views.py" = ["RUF012"]
+"**/serializers.py" = ["RUF012"]
+"**/models.py" = ["RUF012"]
+"**/admin.py" = ["RUF012"]

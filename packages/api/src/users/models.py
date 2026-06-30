@@ -34,7 +34,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS: list[str] = []  # noqa: RUF012  Django auth API expects a list here.
+    REQUIRED_FIELDS: list[str] = []
 
     objects = UserManager()  # type: ignore[misc]
 
