@@ -125,9 +125,14 @@ $COMPOSE exec -T web python manage.py migrate --noinput
 # ----------------------------------------------------------------------
 
 smoke() {
+    # -L follows redirects. The Next.js proxy now sends / -> /en (307)
+    # for locale routing, so a strict 200 check on the raw URL fails
+    # even though the site is up. We assert on the final status after
+    # any 3xx hops so smoke stays a semantic "the site works" check,
+    # not a structural one.
     local url="$1"
     for attempt in 1 2 3 4 5; do
-        status="$(curl -sk -o /dev/null -w '%{http_code}' "$url" || true)"
+        status="$(curl -skL -o /dev/null -w '%{http_code}' "$url" || true)"
         if [ "$status" = "200" ]; then
             echo "smoke: $url -> 200 OK"
             return 0
