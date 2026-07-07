@@ -67,8 +67,14 @@ ENV PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=api.settings
 
 # Non-root user. gunicorn doesn't need root, and one less attack surface.
+# `install -d -o app -g app /app` pre-creates the WORKDIR with the right
+# ownership. Without this, WORKDIR /app creates the directory owned by
+# root, and gunicorn's control-server (which writes /app/.gunicorn on
+# startup) fails with EACCES under USER app — noisy in logs, harmless
+# for request handling but avoidable.
 RUN groupadd --system --gid 1001 app \
- && useradd  --system --uid 1001 --gid app --no-create-home --home-dir /app app
+ && useradd  --system --uid 1001 --gid app --no-create-home --home-dir /app app \
+ && install -d -o app -g app /app
 
 WORKDIR /app
 
