@@ -85,6 +85,18 @@ def make_approved_key(user_id: int) -> str:
     return f"processed/ai/{user_id}/{uuid.uuid4().hex}.png"
 
 
+def make_download_presign_with_ttl(*, key: str, ttl: int) -> str:
+    """Same as make_download_presign but with a caller-supplied TTL.
+    Used by the TTS endpoint so cached mp3 URLs live long enough for
+    the browser <audio> element to play them through."""
+    url: str = get_s3_presigner().generate_presigned_url(
+        "get_object",
+        Params={"Bucket": settings.S3_UPLOADS_BUCKET, "Key": key},
+        ExpiresIn=ttl,
+    )
+    return url
+
+
 def copy_generated_to_uploads(*, src_key: str, dst_key: str) -> None:
     """Copy a draft PNG from the generated bucket (us-west-2) into the
     uploads bucket (eu-central-1). The destination client is region-pinned
