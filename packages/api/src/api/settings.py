@@ -257,6 +257,11 @@ AI_ALLOWED_ASPECT_RATIOS = ["1:1", "4:5", "16:9"]
 RATELIMIT_ENABLE = env_bool("RATELIMIT_ENABLE", default=True)
 REDIS_URL = env("REDIS_URL", "redis://localhost:6379/2")
 
+# Long-poll timeout for /api/orders/<id>/wait-confirm/. Kept below common
+# proxy read-timeouts (nginx default 60s) so we return before the client
+# gets a truncated connection.
+WAIT_CONFIRM_TIMEOUT_SECONDS = int(env("WAIT_CONFIRM_TIMEOUT_SECONDS", "25"))
+
 
 # ----------------------------------------------------------------------
 # i18n + static
