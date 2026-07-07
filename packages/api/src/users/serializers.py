@@ -31,6 +31,19 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "email", "avatar"]
 
 
+class SessionUserSerializer(UserSerializer):
+    """UserSerializer + `expires_at` — the ISO-8601 deadline of the current
+    access token. The web client uses it to schedule a "session about to
+    expire" warning and an auto sign-off at the deadline.
+    """
+
+    expires_at = serializers.DateTimeField(read_only=True)
+
+    class Meta(UserSerializer.Meta):
+        fields = [*UserSerializer.Meta.fields, "expires_at"]
+        read_only_fields = [*UserSerializer.Meta.read_only_fields, "expires_at"]
+
+
 class UserUpdateSerializer(serializers.ModelSerializer):
     # `source="avatar_media"` makes the public input key avatar_media_id
     # while the model field on User is the FK named avatar_media. Pass
