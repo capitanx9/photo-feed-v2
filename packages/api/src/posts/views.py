@@ -121,6 +121,10 @@ class PostListCreateView(APIView):
     """GET = public feed (cursor-paginated published posts).
     POST = authenticated user creates a post from media they already uploaded."""
 
+    # AllowAny on the class so GET stays open (feed is public); POST
+    # keeps its own is_authenticated check below.
+    permission_classes = [AllowAny]
+
     @posts_schema(
         summary="List published posts (feed)",
         description="Cursor-paginated feed of all published posts. Public.",
