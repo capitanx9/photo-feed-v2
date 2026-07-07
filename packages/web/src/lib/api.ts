@@ -122,3 +122,28 @@ export type Cart = {
   total: string;
   updated_at: string;
 };
+
+export type OrderStatus = "paid" | "shipped" | "cancelled";
+export type PaymentMethod = "card" | "paypal" | "crypto" | "cod";
+
+export type OrderItem = {
+  id: number;
+  post_id: number;
+  qty: number;
+  price_at_purchase: string;
+  line_total: number | string;
+};
+
+export type Order = {
+  id: number;
+  status: OrderStatus;
+  total: string;
+  payment_method: PaymentMethod;
+  shipping_name: string;
+  shipping_address: string;
+  shipping_city: string;
+  shipping_zip: string;
+  shipping_country: string;
+  items: OrderItem[];
+  created_at: string;
+};
