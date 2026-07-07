@@ -66,19 +66,20 @@ RUN addgroup --system --gid 1001 nodejs \
 # minimum runtime — server.js + a trimmed node_modules + .next/server.
 # We also need the `static` and `public` directories alongside.
 COPY --from=builder --chown=nextjs:nodejs /app/packages/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/packages/web/.next/static ./packages/web/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/packages/web/public ./packages/web/public
+# Next 16 standalone output no longer prefixes with the source subdir,
+# so server.js lives at /app/server.js and reads static + public from
+# /app/.next/static and /app/public. Copying them under packages/web/
+# (as the older layout required) makes them 404 in the browser.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/web/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/packages/web/public ./public
 
 USER nextjs
 
 EXPOSE 3000
 
 # server.js is the entrypoint Next generates for the standalone server.
-# Next places it at the *root* of the standalone output, even when the
-# app is built from a subdirectory like packages/web — so after copying
-# .next/standalone to /app/, the entrypoint is /app/server.js. Static
-# and public assets still live under packages/web/ because server.js
-# references them by their original build-time path.
+# It lives at the root of the standalone output and reads .next/static
+# and public/ relative to itself.
 #
 # server.js honours HOSTNAME and PORT from env — that's why we pin both
 # above (and reaffirm HOSTNAME in compose to override Docker's
