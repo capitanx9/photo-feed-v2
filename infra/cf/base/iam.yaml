@@ -473,6 +473,17 @@ Resources:
                   - cloudformation:DescribeStacks
                 Resource:
                   - !Sub arn:aws:cloudformation:eu-central-1:${AccountId}:stack/photo-feed-ec2-*/*
+        # Amazon Polly powers the /api/posts/<id>/tts/ endpoint. Polly
+        # has no resource-level permissions — the action always requires
+        # "*" as its Resource.
+        - PolicyName: PhotoFeedInstanceRole-Polly
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - polly:SynthesizeSpeech
+                Resource: "*"
 
   PhotoFeedInstanceProfile:
     Type: AWS::IAM::InstanceProfile
