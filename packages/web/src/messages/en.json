@@ -149,6 +149,17 @@
   "common": {
     "loading": "Loading…"
   },
+  "errors": {
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "The page you're looking for doesn't exist or was moved.",
+    "goHome": "Go home",
+    "serverTitle": "Something went wrong",
+    "serverBody": "An unexpected error occurred while rendering this page. You can try again — if it keeps happening, please come back in a bit.",
+    "tryAgain": "Try again"
+  },
+  "toast": {
+    "serverError": "Server error. Please try again."
+  },
   "validation": {
     "emailRequired": "Email is required",
     "emailInvalid": "Enter a valid email address",
