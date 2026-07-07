@@ -81,6 +81,11 @@ AUTH_USER_MODEL = "users.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # WhiteNoise serves collected static files (Django admin CSS/JS,
+    # DRF browsable API assets) directly from gunicorn — nginx routes
+    # /static/ to the backend, this middleware answers before the URL
+    # resolver sees the request. Must come right after SecurityMiddleware.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -274,6 +279,18 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# WhiteNoise compressed + hashed storage. Ships gzip/brotli variants
+# and adds a content hash to each filename so browsers can cache
+# admin CSS/JS aggressively.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 # ----------------------------------------------------------------------
