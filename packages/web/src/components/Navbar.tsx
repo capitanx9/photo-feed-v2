@@ -26,6 +26,12 @@ export function Navbar() {
           ) : user ? (
             <>
               <Link
+                href="/posts/new"
+                className="rounded-full bg-foreground px-3 py-1 text-background hover:bg-[#383838] dark:hover:bg-[#ccc]"
+              >
+                + Post
+              </Link>
+              <Link
                 href="/profile"
                 className="text-zinc-600 hover:text-foreground dark:text-zinc-300"
               >

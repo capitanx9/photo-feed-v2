@@ -87,3 +87,22 @@ export type Page<T> = {
   previous: string | null;
   results: T[];
 };
+
+export type GenerationStatus = "queued" | "running" | "ready" | "failed";
+
+export type GenerationJob = {
+  id: number;
+  prompt: string;
+  variants_count: number;
+  aspect_ratio: string;
+  status: GenerationStatus;
+  image_urls: string[];
+  error: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GenerationCreateResponse = {
+  job_id: number;
+  status_url: string;
+};
