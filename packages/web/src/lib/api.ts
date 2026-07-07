@@ -93,6 +93,14 @@ export type User = {
   avatar: UserAvatar | null;
 };
 
+// /api/auth/login/, /api/auth/refresh/, /api/auth/me/ return the User plus
+// `expires_at` — the ISO-8601 deadline of the current access-token cookie.
+// The frontend schedules a session-expiring warning + auto sign-off from it
+// (see AuthProvider). `avatar` may be absent on legacy responses that don't
+// include the session field; treat both fields as always-present here since
+// the current API always returns them.
+export type SessionUser = User & { expires_at: string };
+
 export type PostMedia = {
   id: number;
   kind: "post" | "avatar";

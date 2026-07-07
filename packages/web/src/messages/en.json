@@ -157,6 +157,14 @@
   "common": {
     "loading": "Loading…"
   },
+  "session": {
+    "title": "Session about to expire",
+    "body": "Your session expires in 1 minute. Stay signed in?",
+    "stay": "Stay signed in",
+    "staying": "Staying…",
+    "logout": "Log out",
+    "loggingOut": "Logging out…"
+  },
   "errors": {
     "notFoundTitle": "Page not found",
     "notFoundBody": "The page you're looking for doesn't exist or was moved.",
