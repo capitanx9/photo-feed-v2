@@ -12,8 +12,12 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useHref, useT } from "@/lib/i18n";
+import { fieldBorder, hasErrors, type FieldErrors } from "@/lib/validation";
+import { OrderWaitPopup } from "@/components/OrderWaitPopup";
 
 const PAYMENT_METHOD_KEYS: PaymentMethod[] = ["card", "paypal", "crypto", "cod"];
+
+type CheckoutField = "name" | "address" | "city" | "zip";
 
 export default function CheckoutPage() {
   const { user, loading: authLoading } = useAuth();
@@ -28,8 +32,10 @@ export default function CheckoutPage() {
   const [zip, setZip] = useState("");
   const [country, setCountry] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
+  const [errors, setErrors] = useState<FieldErrors<CheckoutField>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace(href("/login"));
@@ -40,7 +46,7 @@ export default function CheckoutPage() {
       const c = await api.get<Cart>("/api/cart/");
       setCart(c);
     } catch (err) {
-      setError(
+      setApiError(
         err instanceof ApiFetchError
           ? (err.data.detail as string) || `HTTP ${err.status}`
           : t("checkout.failedLoad"),
@@ -55,9 +61,28 @@ export default function CheckoutPage() {
     if (user) load();
   }, [user, load]);
 
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
+  function validate(): FieldErrors<CheckoutField> {
+    const e: FieldErrors<CheckoutField> = {};
+    if (!name.trim()) e.name = t("validation.required");
+    if (!address.trim()) e.address = t("validation.required");
+    if (!city.trim()) e.city = t("validation.required");
+    const zipTrimmed = zip.trim();
+    if (!zipTrimmed) e.zip = t("validation.required");
+    else if (zipTrimmed.length < 3) e.zip = t("validation.zipMin");
+    return e;
+  }
+
+  function clearFieldError(field: CheckoutField) {
+    if (errors[field])
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+  }
+
+  async function handleSubmit(ev: FormEvent<HTMLFormElement>) {
+    ev.preventDefault();
+    setApiError(null);
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
     setSubmitting(true);
     try {
       const order = await api.post<Order>("/api/orders/checkout/", {
@@ -68,15 +93,31 @@ export default function CheckoutPage() {
         shipping_zip: zip.trim(),
         shipping_country: country.trim(),
       });
-      router.push(href(`/orders?highlight=${order.id}`));
+      if (order.status === "pending") {
+        // Open the wait-for-confirmation popup; keep the form disabled
+        // while the popup polls the server.
+        setPendingOrderId(order.id);
+      } else {
+        router.push(href(`/orders?highlight=${order.id}`));
+      }
     } catch (err) {
-      setError(
+      setApiError(
         err instanceof ApiFetchError
           ? (err.data.detail as string) || `HTTP ${err.status}`
           : t("checkout.failedPlace"),
       );
       setSubmitting(false);
     }
+  }
+
+  function handleConfirmed(order: Order) {
+    setPendingOrderId(null);
+    router.push(href(`/orders?highlight=${order.id}`));
+  }
+
+  function handleCancelWait() {
+    setPendingOrderId(null);
+    router.push(href("/orders"));
   }
 
   if (authLoading || !user || cartLoading) {
@@ -99,9 +140,11 @@ export default function CheckoutPage() {
     );
   }
 
+  const disabled = submitting || hasErrors(errors);
+
   return (
     <main className="mx-auto grid w-full max-w-4xl flex-1 grid-cols-1 gap-8 px-4 py-8 md:grid-cols-[minmax(0,1fr)_280px]">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold">{t("checkout.title")}</h1>
 
         <section className="flex flex-col gap-3">
@@ -111,43 +154,67 @@ export default function CheckoutPage() {
           <label className="flex flex-col gap-1 text-sm">
             {t("checkout.fullName")}
             <input
-              required
               maxLength={128}
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="rounded-md border border-black/[.12] bg-transparent px-3 py-2 outline-none focus:border-foreground dark:border-white/[.2]"
+              onChange={(ev) => {
+                setName(ev.target.value);
+                clearFieldError("name");
+              }}
+              aria-invalid={errors.name ? true : undefined}
+              className={fieldBorder(errors.name)}
             />
+            {errors.name && (
+              <span className="text-xs text-red-600">{errors.name}</span>
+            )}
           </label>
           <label className="flex flex-col gap-1 text-sm">
             {t("checkout.address")}
             <input
-              required
               maxLength={256}
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="rounded-md border border-black/[.12] bg-transparent px-3 py-2 outline-none focus:border-foreground dark:border-white/[.2]"
+              onChange={(ev) => {
+                setAddress(ev.target.value);
+                clearFieldError("address");
+              }}
+              aria-invalid={errors.address ? true : undefined}
+              className={fieldBorder(errors.address)}
             />
+            {errors.address && (
+              <span className="text-xs text-red-600">{errors.address}</span>
+            )}
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-sm">
               {t("checkout.city")}
               <input
-                required
                 maxLength={128}
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="rounded-md border border-black/[.12] bg-transparent px-3 py-2 outline-none focus:border-foreground dark:border-white/[.2]"
+                onChange={(ev) => {
+                  setCity(ev.target.value);
+                  clearFieldError("city");
+                }}
+                aria-invalid={errors.city ? true : undefined}
+                className={fieldBorder(errors.city)}
               />
+              {errors.city && (
+                <span className="text-xs text-red-600">{errors.city}</span>
+              )}
             </label>
             <label className="flex flex-col gap-1 text-sm">
               {t("checkout.zip")}
               <input
-                required
                 maxLength={32}
                 value={zip}
-                onChange={(e) => setZip(e.target.value)}
-                className="rounded-md border border-black/[.12] bg-transparent px-3 py-2 outline-none focus:border-foreground dark:border-white/[.2]"
+                onChange={(ev) => {
+                  setZip(ev.target.value);
+                  clearFieldError("zip");
+                }}
+                aria-invalid={errors.zip ? true : undefined}
+                className={fieldBorder(errors.zip)}
               />
+              {errors.zip && (
+                <span className="text-xs text-red-600">{errors.zip}</span>
+              )}
             </label>
           </div>
           <label className="flex flex-col gap-1 text-sm">
@@ -155,7 +222,7 @@ export default function CheckoutPage() {
             <input
               maxLength={64}
               value={country}
-              onChange={(e) => setCountry(e.target.value)}
+              onChange={(ev) => setCountry(ev.target.value)}
               className="rounded-md border border-black/[.12] bg-transparent px-3 py-2 outline-none focus:border-foreground dark:border-white/[.2]"
             />
           </label>
@@ -189,15 +256,19 @@ export default function CheckoutPage() {
           </div>
         </section>
 
-        {error && (
-          <p aria-live="polite" className="text-sm text-red-600">
-            {error}
+        {apiError && (
+          <p
+            aria-live="polite"
+            role="alert"
+            className="rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-600"
+          >
+            {apiError}
           </p>
         )}
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={disabled}
           className="self-start rounded-full bg-foreground px-6 py-2 text-background hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
         >
           {submitting ? t("checkout.placing") : t("checkout.placeOrder")}
@@ -229,6 +300,14 @@ export default function CheckoutPage() {
           {t("checkout.backToCart")}
         </Link>
       </aside>
+
+      {pendingOrderId !== null && (
+        <OrderWaitPopup
+          orderId={pendingOrderId}
+          onConfirmed={handleConfirmed}
+          onCancel={handleCancelWait}
+        />
+      )}
     </main>
   );
 }

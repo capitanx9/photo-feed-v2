@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Navbar } from "@/components/Navbar";
 import { SessionExpiryPopup } from "@/components/SessionExpiryPopup";
+import { Toaster } from "@/components/Toaster";
 import { AuthProvider } from "@/lib/auth";
 import { LOCALES, isLocale } from "@/lib/i18n-config";
 import { I18nProvider } from "@/lib/i18n";
@@ -47,6 +48,7 @@ export default async function LangLayout({
             <Navbar />
             {children}
             <SessionExpiryPopup />
+            <Toaster />
           </AuthProvider>
         </I18nProvider>
       </body>
