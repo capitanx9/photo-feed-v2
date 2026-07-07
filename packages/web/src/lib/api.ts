@@ -50,8 +50,16 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
+export type UserAvatar = {
+  id: number;
+  kind: "post" | "avatar";
+  status: "pending" | "ready" | "failed";
+  url: string | null;
+  created_at: string;
+};
+
 export type User = {
   id: number;
   email: string;
-  avatar: string | null;
+  avatar: UserAvatar | null;
 };
