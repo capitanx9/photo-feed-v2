@@ -77,7 +77,7 @@ Resources:
       Environment:
         Variables:
           DRAFTS_BUCKET: photo-feed-generated-usw2
-          BEDROCK_MODEL_ID: stability.sd3-large-v1:0
+          BEDROCK_MODEL_ID: stability.sd3-5-large-v1:0
 
 Outputs:
 
