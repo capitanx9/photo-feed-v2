@@ -3,6 +3,7 @@ from django.http import HttpRequest
 from django.utils.translation import ngettext
 
 from .models import Cart, CartItem, Order, OrderItem
+from .wait_confirm import publish_status
 
 
 class OrderItemInline(admin.TabularInline):
@@ -23,7 +24,15 @@ class OrderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Approve selected pending orders (→ paid)")
     def approve_orders(self, request: HttpRequest, queryset) -> None:  # type: ignore[no-untyped-def]
-        updated = queryset.filter(status=Order.Status.PENDING).update(status=Order.Status.PAID)
+        # Snapshot ids of the pending rows BEFORE the update so we can
+        # wake the right long-poll subscribers; the queryset itself is
+        # lazy and would come back empty after the flip.
+        pending_ids = list(
+            queryset.filter(status=Order.Status.PENDING).values_list("id", flat=True)
+        )
+        updated = Order.objects.filter(id__in=pending_ids).update(status=Order.Status.PAID)
+        for order_id in pending_ids:
+            publish_status(order_id)
         self.message_user(
             request,
             ngettext(
