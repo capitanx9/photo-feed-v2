@@ -98,7 +98,19 @@ export default function NewPostPage() {
     );
   }
 
-  const disabled = publishing || readyMediaIds.length === 0 || hasErrors(errors);
+  // Any slot mid-flight blocks Publish. Otherwise a fast click after
+  // the first slot becomes `ready` would ship the post with only that
+  // one media, orphaning the still-uploading second/third slot (they
+  // land as PostMedia rows with post=null and get GC'd later).
+  const inflight = slots.some(
+    (s) =>
+      s.kind === "uploading" ||
+      s.kind === "generating" ||
+      s.kind === "approving" ||
+      s.kind === "picking",
+  );
+  const disabled =
+    publishing || readyMediaIds.length === 0 || inflight || hasErrors(errors);
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
@@ -172,13 +184,20 @@ export default function NewPostPage() {
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={disabled}
-          className="self-start rounded-full bg-foreground px-6 py-2 text-background hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
-        >
-          {publishing ? t("newPost.publishing") : t("newPost.publish")}
-        </button>
+        <div className="flex flex-col gap-1">
+          <button
+            type="submit"
+            disabled={disabled}
+            className="self-start rounded-full bg-foreground px-6 py-2 text-background hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
+          >
+            {publishing ? t("newPost.publishing") : t("newPost.publish")}
+          </button>
+          {inflight && !publishing && (
+            <span className="text-xs text-zinc-500">
+              {t("newPost.waitForSlots")}
+            </span>
+          )}
+        </div>
       </form>
     </main>
   );
