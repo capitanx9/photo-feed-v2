@@ -1,0 +1,138 @@
+{
+  "nav": {
+    "brand": "photo-feed",
+    "login": "Login",
+    "register": "Register",
+    "newPost": "+ Post",
+    "cart": "Cart",
+    "orders": "Orders",
+    "logout": "Logout"
+  },
+  "auth": {
+    "loginTitle": "Log in",
+    "registerTitle": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "loginSubmit": "Log in",
+    "loginPending": "Logging in…",
+    "registerSubmit": "Create account",
+    "registerPending": "Creating…",
+    "noAccount": "No account?",
+    "haveAccount": "Have an account?",
+    "invalidCreds": "Invalid email or password",
+    "somethingWrong": "Something went wrong. Try again.",
+    "registerFailed": "Registration failed"
+  },
+  "feed": {
+    "title": "Feed",
+    "infiniteScroll": "Infinite scroll",
+    "loading": "Loading…",
+    "loadingMore": "Loading more…",
+    "loadMore": "Load more",
+    "endOfFeed": "End of feed",
+    "empty": "No posts yet. Be the first to publish something.",
+    "untitled": "Untitled",
+    "noImage": "No image"
+  },
+  "profile": {
+    "title": "Profile",
+    "signedInAs": "Signed in as",
+    "changeAvatar": "Change avatar",
+    "uploading": "Uploading…",
+    "processing": "Processing…",
+    "avatarHint": "JPEG / PNG / WebP · up to 10 MB · cropped to 512×512"
+  },
+  "post": {
+    "author": "Author",
+    "caption": "Caption",
+    "notForSale": "Not for sale",
+    "yourOwn": "Your own post",
+    "adding": "Adding…",
+    "added": "Added ✓",
+    "addToCart": "Add to cart",
+    "goToCart": "Go to cart",
+    "notFound": "Post not found",
+    "loadFailed": "Failed to load post",
+    "postedOn": "Posted"
+  },
+  "newPost": {
+    "title": "Create post",
+    "slotsHint": "Up to 3 images. Mix uploads and AI-generated variants freely.",
+    "slot": "Slot",
+    "reset": "Reset",
+    "upload": "Upload",
+    "ai": "AI",
+    "chooseFile": "Choose file",
+    "prompt": "Prompt (e.g. leather sneaker on white)",
+    "generateVariants": "Generate 4 variants",
+    "uploadingProcessing": "Uploading & processing…",
+    "generating": "Generating with AI…",
+    "approving": "Saving pick…",
+    "empty": "Empty",
+    "captionLabel": "Caption",
+    "captionPlaceholder": "Say something about it (optional)",
+    "priceLabel": "Price (EUR, optional — leave empty to make it non-shoppable)",
+    "publish": "Publish",
+    "publishing": "Publishing…",
+    "needImage": "Add at least one image before publishing.",
+    "failedPublish": "Failed to publish"
+  },
+  "cart": {
+    "title": "Cart",
+    "empty": "Your cart is empty.",
+    "browseFeed": "Browse the feed",
+    "each": "each",
+    "remove": "Remove",
+    "total": "Total",
+    "checkout": "Checkout",
+    "decrease": "Decrease quantity",
+    "increase": "Increase quantity",
+    "failedLoad": "Failed to load cart",
+    "failedUpdate": "Failed to update",
+    "failedRemove": "Failed to remove"
+  },
+  "checkout": {
+    "title": "Checkout",
+    "shipping": "Shipping",
+    "fullName": "Full name",
+    "address": "Address",
+    "city": "City",
+    "zip": "ZIP",
+    "country": "Country (optional)",
+    "payment": "Payment",
+    "methods": {
+      "card": "Card",
+      "paypal": "PayPal",
+      "crypto": "Crypto",
+      "cod": "Cash on delivery"
+    },
+    "placeOrder": "Place order",
+    "placing": "Placing order…",
+    "summary": "Summary",
+    "backToCart": "Back to cart",
+    "empty": "Your cart is empty — nothing to check out.",
+    "failedLoad": "Failed to load cart",
+    "failedPlace": "Failed to place order"
+  },
+  "orders": {
+    "title": "Orders",
+    "placed": "Order #{id} placed. It's the first row below.",
+    "empty": "You haven't placed any orders yet.",
+    "browseFeed": "Browse the feed",
+    "shippingTo": "Shipping to",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…",
+    "failedLoad": "Failed to load orders",
+    "orderId": "Order #{id}",
+    "items": "items",
+    "item": "item",
+    "status": {
+      "paid": "paid",
+      "shipped": "shipped",
+      "cancelled": "cancelled"
+    }
+  },
+  "common": {
+    "loading": "Loading…"
+  }
+}

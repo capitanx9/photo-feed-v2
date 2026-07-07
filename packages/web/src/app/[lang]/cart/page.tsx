@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ApiFetchError, api, type Cart, type Post } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useHref, useT } from "@/lib/i18n";
 
 export default function CartPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const t = useT();
+  const href = useHref();
   const [cart, setCart] = useState<Cart | null>(null);
   const [posts, setPosts] = useState<Record<number, Post>>({});
   const [loading, setLoading] = useState(true);
@@ -16,8 +19,8 @@ export default function CartPage() {
   const [busyItemId, setBusyItemId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) router.replace("/login");
-  }, [authLoading, user, router]);
+    if (!authLoading && !user) router.replace(href("/login"));
+  }, [authLoading, user, router, href]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -40,15 +43,14 @@ export default function CartPage() {
       setError(
         err instanceof ApiFetchError
           ? (err.data.detail as string) || `HTTP ${err.status}`
-          : "Failed to load cart",
+          : t("cart.failedLoad"),
       );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
-    // Initial load is a side-effect that intentionally sets state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (user) load();
   }, [user, load]);
@@ -63,7 +65,7 @@ export default function CartPage() {
       setError(
         err instanceof ApiFetchError
           ? (err.data.detail as string) || `HTTP ${err.status}`
-          : "Failed to update",
+          : t("cart.failedUpdate"),
       );
     } finally {
       setBusyItemId(null);
@@ -79,7 +81,7 @@ export default function CartPage() {
       setError(
         err instanceof ApiFetchError
           ? (err.data.detail as string) || `HTTP ${err.status}`
-          : "Failed to remove",
+          : t("cart.failedRemove"),
       );
     } finally {
       setBusyItemId(null);
@@ -89,7 +91,7 @@ export default function CartPage() {
   if (authLoading || !user || loading) {
     return (
       <main className="mx-auto flex w-full max-w-3xl flex-1 items-center justify-center px-4 py-16">
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-zinc-500">{t("common.loading")}</p>
       </main>
     );
   }
@@ -98,7 +100,7 @@ export default function CartPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-      <h1 className="mb-6 text-2xl font-semibold">Cart</h1>
+      <h1 className="mb-6 text-2xl font-semibold">{t("cart.title")}</h1>
 
       {error && (
         <p aria-live="polite" className="mb-4 text-sm text-red-600">
@@ -108,9 +110,9 @@ export default function CartPage() {
 
       {isEmpty ? (
         <div className="rounded-lg border border-dashed border-black/[.12] p-8 text-center dark:border-white/[.2]">
-          <p className="text-zinc-500">Your cart is empty.</p>
-          <Link href="/" className="mt-3 inline-block underline">
-            Browse the feed
+          <p className="text-zinc-500">{t("cart.empty")}</p>
+          <Link href={href("/")} className="mt-3 inline-block underline">
+            {t("cart.browseFeed")}
           </Link>
         </div>
       ) : (
@@ -125,7 +127,7 @@ export default function CartPage() {
               return (
                 <li key={item.id} className="flex items-center gap-4 p-4">
                   <Link
-                    href={`/posts/${item.post_id}`}
+                    href={href(`/posts/${item.post_id}`)}
                     className="h-16 w-16 shrink-0 overflow-hidden rounded bg-zinc-100 dark:bg-zinc-900"
                   >
                     {cover?.url ? (
@@ -144,12 +146,14 @@ export default function CartPage() {
 
                   <div className="min-w-0 flex-1">
                     <Link
-                      href={`/posts/${item.post_id}`}
+                      href={href(`/posts/${item.post_id}`)}
                       className="line-clamp-1 text-sm font-medium hover:underline"
                     >
                       {post?.caption || `Post #${item.post_id}`}
                     </Link>
-                    <p className="text-xs text-zinc-500">€{item.price} each</p>
+                    <p className="text-xs text-zinc-500">
+                      €{item.price} {t("cart.each")}
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -157,7 +161,7 @@ export default function CartPage() {
                       type="button"
                       onClick={() => updateQty(item.id, item.qty - 1)}
                       disabled={busy || item.qty <= 1}
-                      aria-label="Decrease quantity"
+                      aria-label={t("cart.decrease")}
                       className="h-7 w-7 rounded-full border border-black/[.08] hover:bg-black/[.04] disabled:opacity-40 dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
                     >
                       −
@@ -167,7 +171,7 @@ export default function CartPage() {
                       type="button"
                       onClick={() => updateQty(item.id, item.qty + 1)}
                       disabled={busy}
-                      aria-label="Increase quantity"
+                      aria-label={t("cart.increase")}
                       className="h-7 w-7 rounded-full border border-black/[.08] hover:bg-black/[.04] disabled:opacity-40 dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
                     >
                       +
@@ -184,7 +188,7 @@ export default function CartPage() {
                     disabled={busy}
                     className="ml-2 text-xs text-zinc-500 underline hover:text-red-600 disabled:opacity-40"
                   >
-                    Remove
+                    {t("cart.remove")}
                   </button>
                 </li>
               );
@@ -192,16 +196,16 @@ export default function CartPage() {
           </ul>
 
           <div className="flex items-center justify-between rounded-lg border border-black/[.08] p-4 dark:border-white/[.145]">
-            <span className="text-sm text-zinc-500">Total</span>
+            <span className="text-sm text-zinc-500">{t("cart.total")}</span>
             <span className="text-2xl font-semibold">€{cart!.total}</span>
           </div>
 
           <div className="flex justify-end">
             <Link
-              href="/checkout"
+              href={href("/checkout")}
               className="rounded-full bg-foreground px-6 py-2 text-background hover:bg-[#383838] dark:hover:bg-[#ccc]"
             >
-              Checkout
+              {t("cart.checkout")}
             </Link>
           </div>
         </div>

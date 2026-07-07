@@ -11,17 +11,15 @@ import {
   type PaymentMethod,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useHref, useT } from "@/lib/i18n";
 
-const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
-  { value: "card", label: "Card" },
-  { value: "paypal", label: "PayPal" },
-  { value: "crypto", label: "Crypto" },
-  { value: "cod", label: "Cash on delivery" },
-];
+const PAYMENT_METHOD_KEYS: PaymentMethod[] = ["card", "paypal", "crypto", "cod"];
 
 export default function CheckoutPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const t = useT();
+  const href = useHref();
   const [cart, setCart] = useState<Cart | null>(null);
   const [cartLoading, setCartLoading] = useState(true);
   const [name, setName] = useState("");
@@ -34,8 +32,8 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) router.replace("/login");
-  }, [authLoading, user, router]);
+    if (!authLoading && !user) router.replace(href("/login"));
+  }, [authLoading, user, router, href]);
 
   const load = useCallback(async () => {
     try {
@@ -45,12 +43,12 @@ export default function CheckoutPage() {
       setError(
         err instanceof ApiFetchError
           ? (err.data.detail as string) || `HTTP ${err.status}`
-          : "Failed to load cart",
+          : t("checkout.failedLoad"),
       );
     } finally {
       setCartLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -70,12 +68,12 @@ export default function CheckoutPage() {
         shipping_zip: zip.trim(),
         shipping_country: country.trim(),
       });
-      router.push(`/orders?highlight=${order.id}`);
+      router.push(href(`/orders?highlight=${order.id}`));
     } catch (err) {
       setError(
         err instanceof ApiFetchError
           ? (err.data.detail as string) || `HTTP ${err.status}`
-          : "Failed to place order",
+          : t("checkout.failedPlace"),
       );
       setSubmitting(false);
     }
@@ -84,7 +82,7 @@ export default function CheckoutPage() {
   if (authLoading || !user || cartLoading) {
     return (
       <main className="mx-auto flex w-full max-w-3xl flex-1 items-center justify-center px-4 py-16">
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-zinc-500">{t("common.loading")}</p>
       </main>
     );
   }
@@ -93,9 +91,9 @@ export default function CheckoutPage() {
   if (empty) {
     return (
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-3 px-4 py-16">
-        <p className="text-zinc-500">Your cart is empty — nothing to check out.</p>
-        <Link href="/" className="underline">
-          Browse the feed
+        <p className="text-zinc-500">{t("checkout.empty")}</p>
+        <Link href={href("/")} className="underline">
+          {t("cart.browseFeed")}
         </Link>
       </main>
     );
@@ -104,14 +102,14 @@ export default function CheckoutPage() {
   return (
     <main className="mx-auto grid w-full max-w-4xl flex-1 grid-cols-1 gap-8 px-4 py-8 md:grid-cols-[minmax(0,1fr)_280px]">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <h1 className="text-2xl font-semibold">Checkout</h1>
+        <h1 className="text-2xl font-semibold">{t("checkout.title")}</h1>
 
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-            Shipping
+            {t("checkout.shipping")}
           </h2>
           <label className="flex flex-col gap-1 text-sm">
-            Full name
+            {t("checkout.fullName")}
             <input
               required
               maxLength={128}
@@ -121,7 +119,7 @@ export default function CheckoutPage() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Address
+            {t("checkout.address")}
             <input
               required
               maxLength={256}
@@ -132,7 +130,7 @@ export default function CheckoutPage() {
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-sm">
-              City
+              {t("checkout.city")}
               <input
                 required
                 maxLength={128}
@@ -142,7 +140,7 @@ export default function CheckoutPage() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              ZIP
+              {t("checkout.zip")}
               <input
                 required
                 maxLength={32}
@@ -153,7 +151,7 @@ export default function CheckoutPage() {
             </label>
           </div>
           <label className="flex flex-col gap-1 text-sm">
-            Country (optional)
+            {t("checkout.country")}
             <input
               maxLength={64}
               value={country}
@@ -165,14 +163,14 @@ export default function CheckoutPage() {
 
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-            Payment
+            {t("checkout.payment")}
           </h2>
           <div className="grid grid-cols-2 gap-2">
-            {PAYMENT_METHODS.map((m) => (
+            {PAYMENT_METHOD_KEYS.map((m) => (
               <label
-                key={m.value}
+                key={m}
                 className={`cursor-pointer rounded-md border p-3 text-sm ${
-                  paymentMethod === m.value
+                  paymentMethod === m
                     ? "border-foreground"
                     : "border-black/[.08] dark:border-white/[.145]"
                 }`}
@@ -180,12 +178,12 @@ export default function CheckoutPage() {
                 <input
                   type="radio"
                   name="payment_method"
-                  value={m.value}
-                  checked={paymentMethod === m.value}
-                  onChange={() => setPaymentMethod(m.value)}
+                  value={m}
+                  checked={paymentMethod === m}
+                  onChange={() => setPaymentMethod(m)}
                   className="mr-2"
                 />
-                {m.label}
+                {t(`checkout.methods.${m}`)}
               </label>
             ))}
           </div>
@@ -202,13 +200,13 @@ export default function CheckoutPage() {
           disabled={submitting}
           className="self-start rounded-full bg-foreground px-6 py-2 text-background hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
         >
-          {submitting ? "Placing order…" : "Place order"}
+          {submitting ? t("checkout.placing") : t("checkout.placeOrder")}
         </button>
       </form>
 
       <aside className="flex h-fit flex-col gap-3 rounded-lg border border-black/[.08] p-4 dark:border-white/[.145]">
         <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-          Summary
+          {t("checkout.summary")}
         </h2>
         <ul className="flex flex-col gap-2 text-sm">
           {cart!.items.map((item) => (
@@ -221,14 +219,14 @@ export default function CheckoutPage() {
           ))}
         </ul>
         <div className="flex items-center justify-between border-t border-black/[.08] pt-3 dark:border-white/[.145]">
-          <span className="text-sm text-zinc-500">Total</span>
+          <span className="text-sm text-zinc-500">{t("cart.total")}</span>
           <span className="text-xl font-semibold">€{cart!.total}</span>
         </div>
         <Link
-          href="/cart"
+          href={href("/cart")}
           className="text-center text-xs text-zinc-500 underline"
         >
-          Back to cart
+          {t("checkout.backToCart")}
         </Link>
       </aside>
     </main>

@@ -1,0 +1,138 @@
+{
+  "nav": {
+    "brand": "photo-feed",
+    "login": "Войти",
+    "register": "Регистрация",
+    "newPost": "+ Пост",
+    "cart": "Корзина",
+    "orders": "Заказы",
+    "logout": "Выйти"
+  },
+  "auth": {
+    "loginTitle": "Вход",
+    "registerTitle": "Создать аккаунт",
+    "email": "Email",
+    "password": "Пароль",
+    "loginSubmit": "Войти",
+    "loginPending": "Входим…",
+    "registerSubmit": "Создать аккаунт",
+    "registerPending": "Создаём…",
+    "noAccount": "Нет аккаунта?",
+    "haveAccount": "Уже есть аккаунт?",
+    "invalidCreds": "Неверный email или пароль",
+    "somethingWrong": "Что-то пошло не так. Попробуйте ещё раз.",
+    "registerFailed": "Регистрация не удалась"
+  },
+  "feed": {
+    "title": "Лента",
+    "infiniteScroll": "Бесконечная прокрутка",
+    "loading": "Загрузка…",
+    "loadingMore": "Загружаем ещё…",
+    "loadMore": "Показать ещё",
+    "endOfFeed": "Конец ленты",
+    "empty": "Пока постов нет. Опубликуй первый.",
+    "untitled": "Без названия",
+    "noImage": "Нет изображения"
+  },
+  "profile": {
+    "title": "Профиль",
+    "signedInAs": "Вы вошли как",
+    "changeAvatar": "Сменить аватар",
+    "uploading": "Загрузка…",
+    "processing": "Обработка…",
+    "avatarHint": "JPEG / PNG / WebP · до 10 МБ · обрезается до 512×512"
+  },
+  "post": {
+    "author": "Автор",
+    "caption": "Описание",
+    "notForSale": "Не продаётся",
+    "yourOwn": "Ваш собственный пост",
+    "adding": "Добавляем…",
+    "added": "Добавлено ✓",
+    "addToCart": "В корзину",
+    "goToCart": "К корзине",
+    "notFound": "Пост не найден",
+    "loadFailed": "Не удалось загрузить пост",
+    "postedOn": "Опубликовано"
+  },
+  "newPost": {
+    "title": "Создать пост",
+    "slotsHint": "До 3 изображений. Можно смешивать загрузки и AI-генерации.",
+    "slot": "Слот",
+    "reset": "Сбросить",
+    "upload": "Загрузить",
+    "ai": "AI",
+    "chooseFile": "Выбрать файл",
+    "prompt": "Промпт (например, кожаный кроссовок на белом)",
+    "generateVariants": "Сгенерировать 4 варианта",
+    "uploadingProcessing": "Загрузка и обработка…",
+    "generating": "Генерируем с помощью AI…",
+    "approving": "Сохраняем выбор…",
+    "empty": "Пусто",
+    "captionLabel": "Описание",
+    "captionPlaceholder": "Скажите что-нибудь (необязательно)",
+    "priceLabel": "Цена (EUR, необязательно — оставьте пустым чтобы сделать пост не для продажи)",
+    "publish": "Опубликовать",
+    "publishing": "Публикуем…",
+    "needImage": "Добавьте хотя бы одно изображение перед публикацией.",
+    "failedPublish": "Не удалось опубликовать"
+  },
+  "cart": {
+    "title": "Корзина",
+    "empty": "Ваша корзина пуста.",
+    "browseFeed": "Открыть ленту",
+    "each": "за штуку",
+    "remove": "Удалить",
+    "total": "Итого",
+    "checkout": "Оформить заказ",
+    "decrease": "Уменьшить количество",
+    "increase": "Увеличить количество",
+    "failedLoad": "Не удалось загрузить корзину",
+    "failedUpdate": "Не удалось обновить",
+    "failedRemove": "Не удалось удалить"
+  },
+  "checkout": {
+    "title": "Оформление заказа",
+    "shipping": "Доставка",
+    "fullName": "ФИО",
+    "address": "Адрес",
+    "city": "Город",
+    "zip": "Индекс",
+    "country": "Страна (необязательно)",
+    "payment": "Оплата",
+    "methods": {
+      "card": "Карта",
+      "paypal": "PayPal",
+      "crypto": "Крипто",
+      "cod": "Наложенный платёж"
+    },
+    "placeOrder": "Оформить",
+    "placing": "Оформляем…",
+    "summary": "Сводка",
+    "backToCart": "Назад в корзину",
+    "empty": "Ваша корзина пуста — нечего оформлять.",
+    "failedLoad": "Не удалось загрузить корзину",
+    "failedPlace": "Не удалось оформить заказ"
+  },
+  "orders": {
+    "title": "Заказы",
+    "placed": "Заказ #{id} оформлен. Он первым в списке ниже.",
+    "empty": "У вас пока нет заказов.",
+    "browseFeed": "Открыть ленту",
+    "shippingTo": "Доставка на имя",
+    "loadMore": "Показать ещё",
+    "loadingMore": "Загружаем…",
+    "failedLoad": "Не удалось загрузить заказы",
+    "orderId": "Заказ #{id}",
+    "items": "поз.",
+    "item": "поз.",
+    "status": {
+      "paid": "оплачено",
+      "shipped": "отправлено",
+      "cancelled": "отменено"
+    }
+  },
+  "common": {
+    "loading": "Загрузка…"
+  }
+}

@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ApiFetchError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useHref, useT } from "@/lib/i18n";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
+  const t = useT();
+  const href = useHref();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -20,13 +23,13 @@ export default function LoginPage() {
     setPending(true);
     try {
       await login(email, password);
-      router.push("/");
+      router.push(href("/"));
       router.refresh();
     } catch (err) {
       const msg =
         err instanceof ApiFetchError
-          ? (err.data.detail as string) || "Invalid email or password"
-          : "Something went wrong. Try again.";
+          ? (err.data.detail as string) || t("auth.invalidCreds")
+          : t("auth.somethingWrong");
       setError(msg);
     } finally {
       setPending(false);
@@ -35,10 +38,10 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-16">
-      <h1 className="mb-6 text-2xl font-semibold">Log in</h1>
+      <h1 className="mb-6 text-2xl font-semibold">{t("auth.loginTitle")}</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm">
-          Email
+          {t("auth.email")}
           <input
             type="email"
             name="email"
@@ -50,7 +53,7 @@ export default function LoginPage() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Password
+          {t("auth.password")}
           <input
             type="password"
             name="password"
@@ -71,13 +74,13 @@ export default function LoginPage() {
           disabled={pending}
           className="rounded-full bg-foreground py-2 text-background hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
         >
-          {pending ? "Logging in…" : "Log in"}
+          {pending ? t("auth.loginPending") : t("auth.loginSubmit")}
         </button>
       </form>
       <p className="mt-6 text-center text-sm text-zinc-500">
-        No account?{" "}
-        <Link href="/register" className="underline">
-          Register
+        {t("auth.noAccount")}{" "}
+        <Link href={href("/register")} className="underline">
+          {t("nav.register")}
         </Link>
       </p>
     </main>

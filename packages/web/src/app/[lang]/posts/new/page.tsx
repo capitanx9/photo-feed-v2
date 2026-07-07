@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiFetchError, api, type Post } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useHref, useT } from "@/lib/i18n";
 import { MediaSlot } from "@/components/MediaSlot";
 
 type SlotStatus =
@@ -20,6 +21,8 @@ const SLOT_COUNT = 3;
 export default function NewPostPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const t = useT();
+  const href = useHref();
   const [slots, setSlots] = useState<SlotStatus[]>(
     Array.from({ length: SLOT_COUNT }, () => ({ kind: "empty" }) as SlotStatus),
   );
@@ -29,8 +32,8 @@ export default function NewPostPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [loading, user, router]);
+    if (!loading && !user) router.replace(href("/login"));
+  }, [loading, user, router, href]);
 
   function updateSlot(i: number, next: SlotStatus) {
     setSlots((prev) => prev.map((s, idx) => (idx === i ? next : s)));
@@ -44,7 +47,7 @@ export default function NewPostPage() {
     e.preventDefault();
     setError(null);
     if (readyMediaIds.length === 0) {
-      setError("Add at least one image before publishing.");
+      setError(t("newPost.needImage"));
       return;
     }
     setPublishing(true);
@@ -55,12 +58,12 @@ export default function NewPostPage() {
       };
       if (price.trim()) body.price = price.trim();
       const post = await api.post<Post>("/api/posts/", body);
-      router.push(`/posts/${post.id}`);
+      router.push(href(`/posts/${post.id}`));
     } catch (err) {
       setError(
         err instanceof ApiFetchError
           ? (err.data.detail as string) || `HTTP ${err.status}`
-          : "Failed to publish",
+          : t("newPost.failedPublish"),
       );
       setPublishing(false);
     }
@@ -69,20 +72,18 @@ export default function NewPostPage() {
   if (loading || !user) {
     return (
       <main className="mx-auto flex w-full max-w-4xl flex-1 items-center justify-center px-4 py-16">
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-zinc-500">{t("common.loading")}</p>
       </main>
     );
   }
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
-      <h1 className="mb-6 text-2xl font-semibold">Create post</h1>
+      <h1 className="mb-6 text-2xl font-semibold">{t("newPost.title")}</h1>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <section>
-          <p className="mb-2 text-sm text-zinc-500">
-            Up to 3 images. Mix uploads and AI-generated variants freely.
-          </p>
+          <p className="mb-2 text-sm text-zinc-500">{t("newPost.slotsHint")}</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {slots.map((s, i) => (
               <MediaSlot
@@ -97,17 +98,17 @@ export default function NewPostPage() {
 
         <section className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
-            Caption
+            {t("newPost.captionLabel")}
             <textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               rows={3}
-              placeholder="Say something about it (optional)"
+              placeholder={t("newPost.captionPlaceholder")}
               className="rounded-md border border-black/[.12] bg-transparent p-2 outline-none focus:border-foreground dark:border-white/[.2]"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Price (EUR, optional — leave empty to make it non-shoppable)
+            {t("newPost.priceLabel")}
             <input
               type="number"
               min="0"
@@ -131,7 +132,7 @@ export default function NewPostPage() {
           disabled={publishing || readyMediaIds.length === 0}
           className="self-start rounded-full bg-foreground px-6 py-2 text-background hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
         >
-          {publishing ? "Publishing…" : "Publish"}
+          {publishing ? t("newPost.publishing") : t("newPost.publish")}
         </button>
       </form>
     </main>
