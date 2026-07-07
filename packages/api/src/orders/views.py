@@ -109,8 +109,8 @@ class CheckoutView(APIView):
         summary="Create an order from the current cart",
         description=(
             "Snapshots each cart item's current post price into the order, then empties the "
-            "cart. The order is created with status='paid' (no real payment integration). "
-            "Empty carts return 400."
+            "cart. The order is created with status='pending' and moves to 'paid' after an "
+            "admin approves it. Empty carts return 400."
         ),
         request=CheckoutSerializer,
         responses={201: OrderSerializer, 400: ERROR_400, 401: ERROR_401},
@@ -134,7 +134,6 @@ class CheckoutView(APIView):
             )
             order = Order.objects.create(
                 user=request.user,
-                status=Order.Status.PAID,
                 total=total,
                 **serializer.validated_data,
             )

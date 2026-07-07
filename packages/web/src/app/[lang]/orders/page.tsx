@@ -197,6 +197,7 @@ function OrderRow({
 function StatusPill({ status }: { status: Order["status"] }) {
   const t = useT();
   const map: Record<Order["status"], string> = {
+    pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
     paid: "bg-green-600/15 text-green-800 dark:text-green-300",
     shipped: "bg-blue-600/15 text-blue-800 dark:text-blue-300",
     cancelled: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400",

@@ -1,4 +1,6 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.http import HttpRequest
+from django.utils.translation import ngettext
 
 from .models import Cart, CartItem, Order, OrderItem
 
@@ -17,6 +19,21 @@ class OrderAdmin(admin.ModelAdmin):
     search_fields = ["user__email", "shipping_name", "shipping_city"]
     readonly_fields = ["total", "created_at"]
     inlines = [OrderItemInline]
+    actions = ["approve_orders"]
+
+    @admin.action(description="Approve selected pending orders (→ paid)")
+    def approve_orders(self, request: HttpRequest, queryset) -> None:  # type: ignore[no-untyped-def]
+        updated = queryset.filter(status=Order.Status.PENDING).update(status=Order.Status.PAID)
+        self.message_user(
+            request,
+            ngettext(
+                "%d order was approved.",
+                "%d orders were approved.",
+                updated,
+            )
+            % updated,
+            messages.SUCCESS,
+        )
 
 
 class CartItemInline(admin.TabularInline):
