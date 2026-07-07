@@ -4,6 +4,8 @@
 // HttpOnly JWT cookies automatically. Every call sets credentials:'include'
 // as a belt-and-braces guard against a future cross-origin split.
 
+import { toast } from "./toast";
+
 export type ApiError = { detail?: string; [field: string]: unknown };
 
 export class ApiFetchError extends Error {
@@ -14,6 +16,21 @@ export class ApiFetchError extends Error {
     this.status = status;
     this.data = data;
   }
+}
+
+// Generic 5xx message. api.ts can't reach into the React i18n context,
+// so we snapshot the two locales here and pick by `document.documentElement.lang`
+// (set by the [lang] layout). Keeps the toast localised without pulling
+// React into this module.
+const SERVER_ERROR_TOAST: Record<string, string> = {
+  en: "Server error. Please try again.",
+  ru: "Ошибка сервера. Попробуйте ещё раз.",
+};
+
+function serverErrorToast(): string {
+  const lang =
+    typeof document !== "undefined" ? document.documentElement.lang : "en";
+  return SERVER_ERROR_TOAST[lang] ?? SERVER_ERROR_TOAST.en;
 }
 
 async function request<T>(
@@ -31,7 +48,19 @@ async function request<T>(
   });
   if (res.status === 204) return undefined as T;
   const data = (await res.json().catch(() => ({}))) as ApiError;
-  if (!res.ok) throw new ApiFetchError(res.status, data);
+  if (!res.ok) {
+    if (res.status >= 500) {
+      // Log the raw failure — production observability picks this up
+      // via the browser console/Sentry, and the user gets a toast so
+      // the failure isn't silent while individual callers unwind.
+      console.error("api 5xx", res.status, path, data);
+      toast(
+        (data.detail as string | undefined) ?? serverErrorToast(),
+        "error",
+      );
+    }
+    throw new ApiFetchError(res.status, data);
+  }
   return data as T;
 }
 
