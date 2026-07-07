@@ -63,3 +63,27 @@ export type User = {
   email: string;
   avatar: UserAvatar | null;
 };
+
+export type PostMedia = {
+  id: number;
+  kind: "post" | "avatar";
+  status: "pending" | "ready" | "failed";
+  url: string | null;
+  created_at: string;
+};
+
+export type Post = {
+  id: number;
+  owner_id: number;
+  caption: string;
+  price: string | null;
+  status: "draft" | "published";
+  media: PostMedia[];
+  created_at: string;
+};
+
+export type Page<T> = {
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
