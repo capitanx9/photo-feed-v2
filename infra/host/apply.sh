@@ -52,6 +52,11 @@ HEALTH_WEB="https://${STAGE_DOMAIN}/"
 
 # ----------------------------------------------------------------------
 # 1) Self-sync from main. main is the contract; the host follows.
+#
+# The git pull is done by the SSM shim in deploy-host-stage BEFORE this
+# script runs — mutating the file bash is currently streaming would
+# silently swap versions mid-execution. Kept here as a defensive re-run
+# for the manual "ssh in and run apply.sh" case.
 # ----------------------------------------------------------------------
 
 git fetch origin main
