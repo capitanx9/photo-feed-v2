@@ -23,9 +23,7 @@ class OrderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Approve selected pending orders (→ paid)")
     def approve_orders(self, request: HttpRequest, queryset) -> None:  # type: ignore[no-untyped-def]
-        updated = queryset.filter(status=Order.Status.PENDING).update(
-            status=Order.Status.PAID
-        )
+        updated = queryset.filter(status=Order.Status.PENDING).update(status=Order.Status.PAID)
         self.message_user(
             request,
             ngettext(
