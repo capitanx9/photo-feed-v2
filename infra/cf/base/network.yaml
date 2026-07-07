@@ -130,7 +130,11 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: photo-feed-ec2-sg
-      GroupDescription: Inbound 80, 443; all outbound. SSH via SSM only.
+      # GroupDescription is immutable — changing it forces SG replacement,
+      # which then collides with the fixed GroupName. Keep the original
+      # text; the current inventory (80, 443, SSH via SSM only) is now
+      # documented in the header comment above.
+      GroupDescription: Inbound 22 (admin), 80, 443; all outbound.
       VpcId: !Ref Vpc
       SecurityGroupIngress:
         - IpProtocol: tcp
