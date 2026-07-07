@@ -1,13 +1,13 @@
-"""generate_image Lambda — Bedrock SD3 → S3 drafts in us-west-2.
+"""generate_image Lambda — Bedrock Stability SD3.5 → S3 drafts in us-west-2.
 
 Invoked synchronously by the Django Celery worker. Generates
-`variants_count` images by calling Bedrock SD3 in parallel
+`variants_count` images by calling Bedrock Stability SD3.5 in parallel
 (asyncio.gather), uploads each PNG to drafts/<user>/<job>/<i>.png in
 the drafts bucket, and returns image_keys + seeds. Presigned GET URLs
 are minted on the Django side, not here — that way the lambda doesn't
 need to know the API's TTL convention.
 
-Region is us-west-2 because that's where Bedrock SD3 lives; the drafts
+Region is us-west-2 because that's where Bedrock Stability SD3.5 lives; the drafts
 bucket is co-located so put_object is a same-region write.
 """
 
@@ -47,7 +47,7 @@ def _required_env(name: str) -> str:
 
 
 def _build_payload(*, prompt: str, aspect_ratio: str, seed: int) -> dict[str, Any]:
-    # Bedrock SD3 ignores width/height — image size is derived from
+    # Bedrock Stability SD3.5 ignores width/height — image size is derived from
     # aspect_ratio (1:1 -> 1024x1024). We also intentionally don't
     # forward negative_prompt: the public endpoint hardcodes it to "".
     return {
@@ -95,7 +95,7 @@ async def _generate_one(
     loop = asyncio.get_event_loop()
     payload = await loop.run_in_executor(None, _invoke_with_retry, model_id, body)
 
-    # Bedrock SD3 returns finish_reasons; non-null means a content filter
+    # Bedrock Stability SD3.5 returns finish_reasons; non-null means a content filter
     # blocked the generation. Surface as a hard error so the Celery task
     # marks the job as failed instead of writing a half-result.
     finish_reason = payload.get("finish_reasons", [None])[0]
