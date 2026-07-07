@@ -10,6 +10,13 @@ import {
 } from "@/lib/ai";
 import { useT } from "@/lib/i18n";
 import {
+  STTError,
+  isSTTSupported,
+  startRecording,
+  transcribe,
+  type RecordingSession,
+} from "@/lib/stt";
+import {
   UploadError,
   uploadFile,
   waitForMediaReady,
@@ -34,7 +41,55 @@ export function MediaSlot({ index, status, onChange }: Props) {
   const t = useT();
   const [mode, setMode] = useState<"upload" | "ai">("upload");
   const [prompt, setPrompt] = useState("");
+  const [voiceState, setVoiceState] = useState<
+    "idle" | "recording" | "transcribing"
+  >("idle");
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recorderRef = useRef<RecordingSession | null>(null);
+  const sttSupported = isSTTSupported();
+
+  async function handleVoiceToggle() {
+    setVoiceError(null);
+    if (voiceState === "idle") {
+      try {
+        recorderRef.current = await startRecording();
+        setVoiceState("recording");
+      } catch (err) {
+        setVoiceError(err instanceof STTError ? err.message : t("newPost.voiceFailed"));
+      }
+      return;
+    }
+    if (voiceState === "recording") {
+      const session = recorderRef.current;
+      recorderRef.current = null;
+      if (!session) {
+        setVoiceState("idle");
+        return;
+      }
+      setVoiceState("transcribing");
+      try {
+        const blob = await session.stop();
+        const { text } = await transcribe(blob);
+        const trimmed = text.trim();
+        if (trimmed) {
+          setPrompt((prev) => (prev.trim() ? `${prev.trim()} ${trimmed}` : trimmed));
+        } else {
+          setVoiceError(t("newPost.voiceEmpty"));
+        }
+      } catch (err) {
+        setVoiceError(
+          err instanceof STTError
+            ? err.message
+            : err instanceof ApiFetchError
+              ? (err.data.detail as string) || `HTTP ${err.status}`
+              : t("newPost.voiceFailed"),
+        );
+      } finally {
+        setVoiceState("idle");
+      }
+    }
+  }
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -196,16 +251,55 @@ export function MediaSlot({ index, status, onChange }: Props) {
             </>
           ) : (
             <>
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder={t("newPost.prompt")}
-                rows={2}
-                className="rounded border border-black/[.12] bg-transparent p-2 text-xs outline-none focus:border-foreground dark:border-white/[.2]"
-              />
+              <div className="relative">
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={t("newPost.prompt")}
+                  rows={2}
+                  className="w-full rounded border border-black/[.12] bg-transparent p-2 pr-9 text-xs outline-none focus:border-foreground dark:border-white/[.2]"
+                />
+                {sttSupported && (
+                  <button
+                    type="button"
+                    onClick={handleVoiceToggle}
+                    disabled={busy || voiceState === "transcribing"}
+                    aria-pressed={voiceState === "recording"}
+                    aria-label={
+                      voiceState === "recording"
+                        ? t("newPost.voiceStop")
+                        : voiceState === "transcribing"
+                          ? t("newPost.voiceTranscribing")
+                          : t("newPost.voiceStart")
+                    }
+                    title={
+                      voiceState === "recording"
+                        ? t("newPost.voiceStop")
+                        : voiceState === "transcribing"
+                          ? t("newPost.voiceTranscribing")
+                          : t("newPost.voiceStart")
+                    }
+                    className={`absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full border text-xs transition ${
+                      voiceState === "recording"
+                        ? "border-red-500 bg-red-500 text-white"
+                        : "border-black/[.12] bg-transparent hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-[#1a1a1a]"
+                    } disabled:opacity-60`}
+                  >
+                    {voiceState === "transcribing" ? "…" : "🎤"}
+                  </button>
+                )}
+              </div>
+              {voiceError && (
+                <p
+                  aria-live="polite"
+                  className="text-[11px] text-red-600"
+                >
+                  {voiceError}
+                </p>
+              )}
               <button
                 type="button"
-                disabled={busy || !prompt.trim()}
+                disabled={busy || !prompt.trim() || voiceState !== "idle"}
                 onClick={handleGenerate}
                 className="rounded-full bg-foreground py-1 text-sm text-background hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
               >
