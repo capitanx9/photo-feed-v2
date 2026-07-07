@@ -128,7 +128,12 @@
     "backToCart": "Back to cart",
     "empty": "Your cart is empty — nothing to check out.",
     "failedLoad": "Failed to load cart",
-    "failedPlace": "Failed to place order"
+    "failedPlace": "Failed to place order",
+    "confirm": {
+      "title": "Waiting for admin to confirm",
+      "description": "Order #{id} is pending review. This usually takes a few moments — you can wait here or check back later from your orders page.",
+      "cancel": "Cancel and view orders"
+    }
   },
   "orders": {
     "title": "Orders",
@@ -151,5 +156,27 @@
   },
   "common": {
     "loading": "Loading…"
+  },
+  "errors": {
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "The page you're looking for doesn't exist or was moved.",
+    "goHome": "Go home",
+    "serverTitle": "Something went wrong",
+    "serverBody": "An unexpected error occurred while rendering this page. You can try again — if it keeps happening, please come back in a bit.",
+    "tryAgain": "Try again"
+  },
+  "toast": {
+    "serverError": "Server error. Please try again."
+  },
+  "validation": {
+    "emailRequired": "Email is required",
+    "emailInvalid": "Enter a valid email address",
+    "passwordRequired": "Password is required",
+    "passwordMin": "Password must be at least 6 characters",
+    "captionMax": "Caption must be at most 500 characters",
+    "priceInvalid": "Price must be a non-negative number with at most 2 decimals",
+    "required": "This field is required",
+    "zipMin": "ZIP must be at least 3 characters",
+    "fixErrors": "Please fix the errors above"
   }
 }
