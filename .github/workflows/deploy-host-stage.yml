@@ -88,6 +88,12 @@ jobs:
           # so the shim only needs to cd + drop privileges to ubuntu (owner
           # of /srv/photo-feed and member of docker group). `sudo -E` is
           # blocked by Ubuntu's default sudoers, so env is passed positionally.
+          # git-pull HERE — not inside apply.sh. bash streams the script
+          # off disk as it executes, so `git reset --hard origin/main` on
+          # line 60 of apply.sh mutates the file bash is still reading and
+          # subsequent lines silently come from the wrong version (or
+          # partial lines). Pulling before the exec means bash reads a
+          # coherent, up-to-date apply.sh from start to finish.
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE" \
             --document-name AWS-RunShellScript \
@@ -96,6 +102,8 @@ jobs:
               "commands": [
                 "set -eu",
                 "cd /srv/photo-feed",
+                "sudo -u ubuntu git fetch origin main",
+                "sudo -u ubuntu git reset --hard origin/main",
                 "sudo -u ubuntu AWS_REGION=${{ env.AWS_REGION }} bash infra/host/apply.sh"
               ],
               "executionTimeout": ["600"]
