@@ -498,6 +498,20 @@ Resources:
                   - transcribe:StartTranscriptionJob
                   - transcribe:GetTranscriptionJob
                 Resource: "*"
+        # The AI generate-image pipeline in Django (ai/tasks.py) invokes
+        # the generate-image Lambda in us-west-2 synchronously. Kept
+        # narrow to the single function ARN — this role runs the whole
+        # web/Celery runtime, so widening to lambda:* on all photo-feed-*
+        # functions would give it far more than it needs.
+        - PolicyName: PhotoFeedInstanceRole-InvokeGenerateImage
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !Sub arn:aws:lambda:us-west-2:${AccountId}:function:photo-feed-generate-image-stage
 
   PhotoFeedInstanceProfile:
     Type: AWS::IAM::InstanceProfile
