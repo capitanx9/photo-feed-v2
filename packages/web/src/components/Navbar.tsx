@@ -38,6 +38,12 @@ export function Navbar() {
                 Cart
               </Link>
               <Link
+                href="/orders"
+                className="rounded-full px-3 py-1 hover:bg-black/[.04] dark:hover:bg-[#1a1a1a]"
+              >
+                Orders
+              </Link>
+              <Link
                 href="/profile"
                 className="text-zinc-600 hover:text-foreground dark:text-zinc-300"
               >
