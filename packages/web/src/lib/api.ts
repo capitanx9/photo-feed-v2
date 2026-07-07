@@ -106,3 +106,19 @@ export type GenerationCreateResponse = {
   job_id: number;
   status_url: string;
 };
+
+export type CartItem = {
+  id: number;
+  post_id: number;
+  qty: number;
+  price: string;
+  line_total: number | string;
+  created_at: string;
+};
+
+export type Cart = {
+  id: number;
+  items: CartItem[];
+  total: string;
+  updated_at: string;
+};

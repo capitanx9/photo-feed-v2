@@ -32,6 +32,12 @@ export function Navbar() {
                 + Post
               </Link>
               <Link
+                href="/cart"
+                className="rounded-full px-3 py-1 hover:bg-black/[.04] dark:hover:bg-[#1a1a1a]"
+              >
+                Cart
+              </Link>
+              <Link
                 href="/profile"
                 className="text-zinc-600 hover:text-foreground dark:text-zinc-300"
               >
