@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useHref, useT } from "@/lib/i18n";
 import { fieldBorder, hasErrors, type FieldErrors } from "@/lib/validation";
+import { OrderWaitPopup } from "@/components/OrderWaitPopup";
 
 const PAYMENT_METHOD_KEYS: PaymentMethod[] = ["card", "paypal", "crypto", "cod"];
 
@@ -34,6 +35,7 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<FieldErrors<CheckoutField>>({});
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace(href("/login"));
@@ -91,7 +93,13 @@ export default function CheckoutPage() {
         shipping_zip: zip.trim(),
         shipping_country: country.trim(),
       });
-      router.push(href(`/orders?highlight=${order.id}`));
+      if (order.status === "pending") {
+        // Open the wait-for-confirmation popup; keep the form disabled
+        // while the popup polls the server.
+        setPendingOrderId(order.id);
+      } else {
+        router.push(href(`/orders?highlight=${order.id}`));
+      }
     } catch (err) {
       setApiError(
         err instanceof ApiFetchError
@@ -100,6 +108,16 @@ export default function CheckoutPage() {
       );
       setSubmitting(false);
     }
+  }
+
+  function handleConfirmed(order: Order) {
+    setPendingOrderId(null);
+    router.push(href(`/orders?highlight=${order.id}`));
+  }
+
+  function handleCancelWait() {
+    setPendingOrderId(null);
+    router.push(href("/orders"));
   }
 
   if (authLoading || !user || cartLoading) {
@@ -282,6 +300,14 @@ export default function CheckoutPage() {
           {t("checkout.backToCart")}
         </Link>
       </aside>
+
+      {pendingOrderId !== null && (
+        <OrderWaitPopup
+          orderId={pendingOrderId}
+          onConfirmed={handleConfirmed}
+          onCancel={handleCancelWait}
+        />
+      )}
     </main>
   );
 }

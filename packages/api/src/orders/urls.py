@@ -8,6 +8,7 @@ from .views import (
     OrderDetailView,
     OrderListView,
 )
+from .wait_confirm import OrderWaitConfirmView
 
 cart_urlpatterns = [
     path("", CartView.as_view(), name="cart"),
@@ -19,4 +20,9 @@ orders_urlpatterns = [
     path("", OrderListView.as_view(), name="order-list"),
     path("checkout/", CheckoutView.as_view(), name="checkout"),
     path("<int:pk>/", OrderDetailView.as_view(), name="order-detail"),
+    path(
+        "<int:pk>/wait-confirm/",
+        OrderWaitConfirmView.as_view(),
+        name="order-wait-confirm",
+    ),
 ]

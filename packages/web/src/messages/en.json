@@ -120,7 +120,12 @@
     "backToCart": "Back to cart",
     "empty": "Your cart is empty — nothing to check out.",
     "failedLoad": "Failed to load cart",
-    "failedPlace": "Failed to place order"
+    "failedPlace": "Failed to place order",
+    "confirm": {
+      "title": "Waiting for admin to confirm",
+      "description": "Order #{id} is pending review. This usually takes a few moments — you can wait here or check back later from your orders page.",
+      "cancel": "Cancel and view orders"
+    }
   },
   "orders": {
     "title": "Orders",
