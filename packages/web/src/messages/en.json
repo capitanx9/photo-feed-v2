@@ -32,7 +32,15 @@
     "endOfFeed": "End of feed",
     "empty": "No posts yet. Be the first to publish something.",
     "untitled": "Untitled",
-    "noImage": "No image"
+    "noImage": "No image",
+    "carousel": {
+      "toggle": "Carousel",
+      "exit": "Exit",
+      "exitHint": "Esc to exit · ← → to navigate",
+      "paused": "Paused",
+      "prev": "Previous post",
+      "next": "Next post"
+    }
   },
   "profile": {
     "title": "Profile",
