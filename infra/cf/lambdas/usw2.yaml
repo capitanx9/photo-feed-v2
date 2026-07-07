@@ -42,8 +42,10 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        # Stub doesn't actually need these yet — but baking them in now
-        # so the real handler in Phase 6 needs zero IAM changes.
+        # Narrow to the exact Bedrock model ARN used by BEDROCK_MODEL_ID
+        # below. Keep both the current sd3-5-large and its predecessor
+        # sd3-large in the list so rollbacks stay one env-var flip and
+        # don't require another IAM stack update.
         - PolicyName: BedrockInvokeStability
           PolicyDocument:
             Version: "2012-10-17"
@@ -52,6 +54,7 @@ Resources:
                 Action:
                   - bedrock:InvokeModel
                 Resource:
+                  - arn:aws:bedrock:us-west-2::foundation-model/stability.sd3-5-large-v1:0
                   - arn:aws:bedrock:us-west-2::foundation-model/stability.sd3-large-v1:0
         - PolicyName: S3WriteDrafts
           PolicyDocument:
