@@ -75,7 +75,12 @@
     "publish": "Publish",
     "publishing": "Publishing…",
     "needImage": "Add at least one image before publishing.",
-    "failedPublish": "Failed to publish"
+    "failedPublish": "Failed to publish",
+    "voiceStart": "Dictate prompt",
+    "voiceStop": "Stop recording",
+    "voiceTranscribing": "Transcribing…",
+    "voiceEmpty": "Didn't catch that — try again.",
+    "voiceFailed": "Voice input failed"
   },
   "cart": {
     "title": "Cart",
