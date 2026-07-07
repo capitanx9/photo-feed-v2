@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  photo-feed DNS — Route 53 hosted zone for photo-feed.click and the
+  stage A-record. Bootstrapped by a one-time CloudFormation IMPORT
+  against the existing hosted zone and record; see docs/runbooks/
+  dns-import-bootstrap.md for the exact commands.
+
+
+Parameters:
+
+  DomainName:
+    Type: String
+    Default: photo-feed.click
+    Description: Registered apex domain.
+
+  StageSubdomain:
+    Type: String
+    Default: stage
+    Description: Subdomain for the stage environment (stage.<DomainName>).
+
+
+Resources:
+
+  # Existing hosted zone — created out-of-band when the domain was
+  # registered via Route 53 domain registration. Imported into this
+  # stack once; managed via CF from then on.
+  HostedZone:
+    Type: AWS::Route53::HostedZone
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Ref DomainName
+
+  # A-record for stage. Value comes from the ec2-stage stack via
+  # !ImportValue so the EIP is the single source of truth.
+  StageARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZone
+      Name: !Sub ${StageSubdomain}.${DomainName}.
+      Type: A
+      TTL: "300"
+      ResourceRecords:
+        - !ImportValue photo-feed-stage-eip
+
+
+Outputs:
+
+  HostedZoneId:
+    Description: Route 53 hosted zone id
+    Value: !Ref HostedZone
+    Export:
+      Name: photo-feed-hosted-zone-id
+
+  HostedZoneNameServers:
+    Description: NS records for the zone (register these with the domain registrar)
+    Value: !Join [",", !GetAtt HostedZone.NameServers]
+    Export:
+      Name: photo-feed-hosted-zone-ns
+
+  StageFqdn:
+    Description: Fully-qualified stage hostname
+    Value: !Sub ${StageSubdomain}.${DomainName}
+    Export:
+      Name: photo-feed-stage-fqdn
