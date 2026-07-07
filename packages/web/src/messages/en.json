@@ -53,7 +53,10 @@
     "goToCart": "Go to cart",
     "notFound": "Post not found",
     "loadFailed": "Failed to load post",
-    "postedOn": "Posted"
+    "postedOn": "Posted",
+    "speakCaption": "🔊 Read caption",
+    "ttsLoading": "Preparing…",
+    "ttsFailed": "Failed to synthesise audio"
   },
   "newPost": {
     "title": "Create post",

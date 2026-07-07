@@ -6,6 +6,10 @@ import { use, useEffect, useState } from "react";
 import { ApiFetchError, api, type Post, type User } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useHref, useT } from "@/lib/i18n";
+import {
+  TTS_MIN_CAPTION_CHARS,
+  synthesizeCaption,
+} from "@/lib/tts";
 
 export default function PostDetailPage({
   params,
@@ -26,6 +30,12 @@ export default function PostDetailPage({
     | { kind: "idle" }
     | { kind: "adding" }
     | { kind: "added" }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+  const [ttsState, setTtsState] = useState<
+    | { kind: "idle" }
+    | { kind: "loading" }
+    | { kind: "ready"; url: string }
     | { kind: "error"; message: string }
   >({ kind: "idle" });
 
@@ -60,6 +70,27 @@ export default function PostDetailPage({
       cancelled = true;
     };
   }, [id, t]);
+
+  async function handleSpeakCaption() {
+    if (!post) return;
+    if (!me) {
+      router.push(href("/login"));
+      return;
+    }
+    setTtsState({ kind: "loading" });
+    try {
+      const { audio_url } = await synthesizeCaption(post.id);
+      setTtsState({ kind: "ready", url: audio_url });
+    } catch (err) {
+      setTtsState({
+        kind: "error",
+        message:
+          err instanceof ApiFetchError
+            ? (err.data.detail as string) || `HTTP ${err.status}`
+            : t("post.ttsFailed"),
+      });
+    }
+  }
 
   async function handleAddToCart() {
     if (!me) {
@@ -162,6 +193,34 @@ export default function PostDetailPage({
               {t("post.caption")}
             </p>
             <p className="whitespace-pre-line text-sm">{post.caption}</p>
+            {post.caption.trim().length >= TTS_MIN_CAPTION_CHARS && (
+              <div className="mt-2 flex flex-col gap-2">
+                {ttsState.kind === "ready" ? (
+                  <audio
+                    controls
+                    autoPlay
+                    src={ttsState.url}
+                    className="w-full"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSpeakCaption}
+                    disabled={ttsState.kind === "loading"}
+                    className="self-start rounded-full border border-black/[.12] px-3 py-1 text-xs hover:bg-black/[.04] disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-[#1a1a1a]"
+                  >
+                    {ttsState.kind === "loading"
+                      ? t("post.ttsLoading")
+                      : t("post.speakCaption")}
+                  </button>
+                )}
+                {ttsState.kind === "error" && (
+                  <p aria-live="polite" className="text-xs text-red-600">
+                    {ttsState.message}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
