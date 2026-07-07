@@ -36,10 +36,11 @@
     "carousel": {
       "toggle": "Carousel",
       "exit": "Exit",
-      "exitHint": "Esc to exit · ← → to navigate",
+      "exitHint": "Esc to exit · ← → to navigate · Enter to open",
       "paused": "Paused",
       "prev": "Previous post",
-      "next": "Next post"
+      "next": "Next post",
+      "openPost": "Open post"
     }
   },
   "profile": {

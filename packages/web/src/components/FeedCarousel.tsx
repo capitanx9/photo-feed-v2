@@ -1,8 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Post } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { useHref, useT } from "@/lib/i18n";
 
 const AUTO_ADVANCE_MS = 5000;
 
@@ -26,6 +27,8 @@ export function FeedCarousel({
   onExit,
 }: Props) {
   const t = useT();
+  const router = useRouter();
+  const href = useHref();
   const [idx, setIdx] = useState(0);
   const [hovering, setHovering] = useState(false);
   const [tabHidden, setTabHidden] = useState(false);
@@ -59,6 +62,12 @@ export function FeedCarousel({
     setIdx((i) => (i > 0 ? i - 1 : count - 1));
   }, [count]);
 
+  const openCurrent = useCallback(() => {
+    if (!current) return;
+    onExit();
+    router.push(href(`/posts/${current.id}`));
+  }, [current, onExit, router, href]);
+
   // Auto-advance timer. Kept in a ref so we can clear it on every
   // dependency change without tripping react-hooks/set-state-in-effect.
   useEffect(() => {
@@ -91,11 +100,14 @@ export function FeedCarousel({
       } else if (e.key === "Escape") {
         e.preventDefault();
         onExit();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        openCurrent();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [goNext, goPrev, onExit]);
+  }, [goNext, goPrev, onExit, openCurrent]);
 
   // Lock body scroll while the overlay owns the viewport.
   useEffect(() => {
@@ -150,6 +162,13 @@ export function FeedCarousel({
           </span>
           <button
             type="button"
+            onClick={openCurrent}
+            className="rounded-full border border-white/20 px-3 py-1 text-sm hover:bg-white/10"
+          >
+            {t("feed.carousel.openPost")}
+          </button>
+          <button
+            type="button"
             onClick={onExit}
             className="rounded-full border border-white/20 px-3 py-1 text-sm hover:bg-white/10"
             aria-label={t("feed.carousel.exit")}
@@ -168,7 +187,12 @@ export function FeedCarousel({
         >
           &lsaquo;
         </button>
-        <div className="mx-auto flex max-h-full w-full max-w-4xl flex-col items-center gap-4 px-6">
+        <button
+          type="button"
+          onClick={openCurrent}
+          aria-label={t("feed.carousel.openPost")}
+          className="mx-auto flex max-h-full w-full max-w-4xl cursor-pointer flex-col items-center gap-4 px-6 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+        >
           <div className="flex max-h-[70vh] w-full items-center justify-center">
             {cover ? (
               // Presigned S3 URL — must be a plain <img>, not next/image.
@@ -197,7 +221,7 @@ export function FeedCarousel({
               )}
             </div>
           </div>
-        </div>
+        </button>
         <button
           type="button"
           onClick={goNext}
