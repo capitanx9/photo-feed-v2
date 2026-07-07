@@ -148,5 +148,16 @@
   },
   "common": {
     "loading": "Loading…"
+  },
+  "validation": {
+    "emailRequired": "Email is required",
+    "emailInvalid": "Enter a valid email address",
+    "passwordRequired": "Password is required",
+    "passwordMin": "Password must be at least 6 characters",
+    "captionMax": "Caption must be at most 500 characters",
+    "priceInvalid": "Price must be a non-negative number with at most 2 decimals",
+    "required": "This field is required",
+    "zipMin": "ZIP must be at least 3 characters",
+    "fixErrors": "Please fix the errors above"
   }
 }
