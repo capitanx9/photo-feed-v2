@@ -86,6 +86,13 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --chown=app:app packages/api/src/ /app/src/
 COPY --chown=app:app packages/api/manage.py /app/manage.py
 
+# Bake collected static files (Django admin CSS/JS, DRF assets) into the
+# image so WhiteNoise can serve them at request time. Settings' env
+# helpers all have safe defaults, so no runtime secrets are needed for
+# a static collection pass. Runs as root, then handed to `app`.
+RUN python /app/manage.py collectstatic --noinput \
+ && chown -R app:app /app/staticfiles
+
 USER app
 
 EXPOSE 8000
