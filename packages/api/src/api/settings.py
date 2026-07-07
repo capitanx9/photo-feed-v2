@@ -214,6 +214,14 @@ S3_UPLOADS_BUCKET = env("S3_UPLOADS_BUCKET", "photo-feed-uploads")
 TTS_MIN_CAPTION_CHARS = int(env("TTS_MIN_CAPTION_CHARS", "140"))
 TTS_VOICE_ID = env("TTS_VOICE_ID", "Joanna")
 TTS_ENGINE = env("TTS_ENGINE", "neural")
+
+# Speech-to-text via Amazon Transcribe. The endpoint takes an audio
+# blob, uploads it under stt/<uuid>.<ext> in the uploads bucket, starts
+# a Transcribe job, and polls until COMPLETED.
+STT_MAX_AUDIO_BYTES = int(env("STT_MAX_AUDIO_BYTES", str(2 * 1024 * 1024)))
+STT_POLL_INTERVAL_SECONDS = float(env("STT_POLL_INTERVAL_SECONDS", "1.0"))
+STT_POLL_TIMEOUT_SECONDS = int(env("STT_POLL_TIMEOUT_SECONDS", "45"))
+
 S3_PRESIGN_TTL_SECONDS = int(env("S3_PRESIGN_TTL_SECONDS", "300"))
 UPLOAD_MAX_BYTES = int(env("UPLOAD_MAX_BYTES", str(10 * 1024 * 1024)))
 UPLOAD_ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"]

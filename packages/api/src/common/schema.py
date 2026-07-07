@@ -10,6 +10,7 @@ ERROR_400 = OpenApiResponse(response=ErrorSerializer, description="Validation er
 ERROR_401 = OpenApiResponse(response=ErrorSerializer, description="Authentication required")
 ERROR_404 = OpenApiResponse(response=ErrorSerializer, description="Not found")
 ERROR_429 = OpenApiResponse(response=ErrorSerializer, description="Rate limit exceeded")
+ERROR_500 = OpenApiResponse(response=ErrorSerializer, description="Server error")
 
 
 def tagged_schema(
