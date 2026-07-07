@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiFetchError, api, type Page, type Post } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { FeedCarousel } from "@/components/FeedCarousel";
 import { PostCard } from "@/components/PostCard";
 
 const FEED_PAGE_PATH = "/api/posts/";
@@ -38,6 +39,7 @@ export default function Home() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>(readInitialMode);
+  const [carousel, setCarousel] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function Home() {
   }, [loadPage]);
 
   useEffect(() => {
-    if (mode !== "infinite" || !nextUrl) return;
+    if (mode !== "infinite" || !nextUrl || carousel) return;
     const el = sentinelRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -83,21 +85,47 @@ export default function Home() {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [mode, nextUrl, loadingMore, loadPage]);
+  }, [mode, nextUrl, loadingMore, loadPage, carousel]);
+
+  const handleLoadMore = useCallback(() => {
+    if (nextUrl && !loadingMore) loadPage(nextUrl, false);
+  }, [nextUrl, loadingMore, loadPage]);
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">{t("feed.title")}</h1>
-        <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-          <input
-            type="checkbox"
-            checked={mode === "infinite"}
-            onChange={(e) => setMode(e.target.checked ? "infinite" : "manual")}
-          />
-          {t("feed.infiniteScroll")}
-        </label>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+            <input
+              type="checkbox"
+              checked={mode === "infinite"}
+              onChange={(e) =>
+                setMode(e.target.checked ? "infinite" : "manual")
+              }
+            />
+            {t("feed.infiniteScroll")}
+          </label>
+          <button
+            type="button"
+            onClick={() => setCarousel(true)}
+            disabled={posts.length === 0}
+            className="rounded-full border border-black/[.08] px-3 py-1 text-sm hover:bg-black/[.04] disabled:opacity-60 dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
+          >
+            {t("feed.carousel.toggle")}
+          </button>
+        </div>
       </div>
+
+      {carousel && (
+        <FeedCarousel
+          posts={posts}
+          nextUrl={nextUrl}
+          loadingMore={loadingMore}
+          onLoadMore={handleLoadMore}
+          onExit={() => setCarousel(false)}
+        />
+      )}
 
       {loading ? (
         <p className="py-16 text-center text-zinc-500">{t("feed.loading")}</p>
