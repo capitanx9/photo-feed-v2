@@ -135,6 +135,7 @@
     "items": "items",
     "item": "item",
     "status": {
+      "pending": "pending",
       "paid": "paid",
       "shipped": "shipped",
       "cancelled": "cancelled"

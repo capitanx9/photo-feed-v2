@@ -31,6 +31,7 @@ class CartItem(models.Model):
 
 class Order(models.Model):
     class Status(models.TextChoices):
+        PENDING = "pending"
         PAID = "paid"
         SHIPPED = "shipped"
         CANCELLED = "cancelled"
@@ -40,7 +41,9 @@ class Order(models.Model):
         on_delete=models.CASCADE,
         related_name="orders",
     )
-    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PAID)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING
+    )
     total = models.DecimalField(max_digits=12, decimal_places=2)
     payment_method = models.CharField(max_length=32)
     shipping_name = models.CharField(max_length=128)

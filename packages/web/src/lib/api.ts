@@ -123,7 +123,7 @@ export type Cart = {
   updated_at: string;
 };
 
-export type OrderStatus = "paid" | "shipped" | "cancelled";
+export type OrderStatus = "pending" | "paid" | "shipped" | "cancelled";
 export type PaymentMethod = "card" | "paypal" | "crypto" | "cod";
 
 export type OrderItem = {
