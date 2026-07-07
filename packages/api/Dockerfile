@@ -89,9 +89,12 @@ COPY --chown=app:app packages/api/manage.py /app/manage.py
 # Bake collected static files (Django admin CSS/JS, DRF assets) into the
 # image so WhiteNoise can serve them at request time. Settings' env
 # helpers all have safe defaults, so no runtime secrets are needed for
-# a static collection pass. Runs as root, then handed to `app`.
-RUN python /app/manage.py collectstatic --noinput \
- && chown -R app:app /app/staticfiles
+# a static collection pass. STATIC_ROOT resolves to /app/src/staticfiles
+# (BASE_DIR is /app/src because settings.py lives at src/api/settings.py),
+# so ask Django where it will write instead of hardcoding a guess.
+RUN STATIC_ROOT="$(python -c 'from django.conf import settings; print(settings.STATIC_ROOT)')" \
+ && python /app/manage.py collectstatic --noinput \
+ && chown -R app:app "$STATIC_ROOT"
 
 USER app
 
