@@ -12,16 +12,6 @@ Description: >
 
 Parameters:
 
-  AdminIP:
-    Type: String
-    Description: >
-      CIDR allowed to SSH into EC2 (port 22). Default = my home IP.
-      Override at deploy time when working from a different network:
-        --parameter-overrides AdminIP=1.2.3.4/32
-    Default: 79.233.19.158/32
-    AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$
-    ConstraintDescription: Must be CIDR in form x.x.x.x/yy
-
   VpcCidr:
     Type: String
     Description: VPC CIDR block. /16 gives 65k IPs — abundant for this project.
@@ -127,24 +117,22 @@ Resources:
 
   # ----------------------------------------------------------------------
   # Security group for EC2:
-  #   - 22  (SSH) only from AdminIP
   #   - 80  (HTTP)  open  — for Lets Encrypt http-01 challenge + redirect
   #   - 443 (HTTPS) open  — the actual app traffic
   #   - all outbound
+  #
+  # No SSH ingress. Shell access is via SSM Session Manager against the
+  # instance's SSM Agent (AmazonSSMManagedInstanceCore is attached to
+  # PhotoFeedInstanceRole in iam.yaml). See docs/runbooks/ssh-via-ssm.md.
   # ----------------------------------------------------------------------
 
   EC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: photo-feed-ec2-sg
-      GroupDescription: Inbound 22 (admin), 80, 443; all outbound.
+      GroupDescription: Inbound 80, 443; all outbound. SSH via SSM only.
       VpcId: !Ref Vpc
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: !Ref AdminIP
-          Description: SSH from admin
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
