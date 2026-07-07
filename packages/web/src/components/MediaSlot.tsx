@@ -8,6 +8,7 @@ import {
   startGeneration,
   waitForGeneration,
 } from "@/lib/ai";
+import { useT } from "@/lib/i18n";
 import {
   UploadError,
   uploadFile,
@@ -30,6 +31,7 @@ type Props = {
 };
 
 export function MediaSlot({ index, status, onChange }: Props) {
+  const t = useT();
   const [mode, setMode] = useState<"upload" | "ai">("upload");
   const [prompt, setPrompt] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,14 +96,16 @@ export function MediaSlot({ index, status, onChange }: Props) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-black/[.08] p-3 dark:border-white/[.145]">
       <div className="flex items-center justify-between text-xs text-zinc-500">
-        <span>Slot {index + 1}</span>
+        <span>
+          {t("newPost.slot")} {index + 1}
+        </span>
         {status.kind !== "empty" && (
           <button
             type="button"
             onClick={reset}
             className="underline hover:no-underline"
           >
-            Reset
+            {t("newPost.reset")}
           </button>
         )}
       </div>
@@ -135,10 +139,10 @@ export function MediaSlot({ index, status, onChange }: Props) {
           </div>
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-center text-xs text-zinc-500">
-            {status.kind === "uploading" && "Uploading & processing…"}
-            {status.kind === "generating" && "Generating with AI…"}
-            {status.kind === "approving" && "Saving pick…"}
-            {status.kind === "empty" && "Empty"}
+            {status.kind === "uploading" && t("newPost.uploadingProcessing")}
+            {status.kind === "generating" && t("newPost.generating")}
+            {status.kind === "approving" && t("newPost.approving")}
+            {status.kind === "empty" && t("newPost.empty")}
             {status.kind === "error" && (
               <span className="text-red-600">{status.message}</span>
             )}
@@ -158,7 +162,7 @@ export function MediaSlot({ index, status, onChange }: Props) {
                   : "border-black/[.08] dark:border-white/[.145]"
               }`}
             >
-              Upload
+              {t("newPost.upload")}
             </button>
             <button
               type="button"
@@ -169,7 +173,7 @@ export function MediaSlot({ index, status, onChange }: Props) {
                   : "border-black/[.08] dark:border-white/[.145]"
               }`}
             >
-              AI
+              {t("newPost.ai")}
             </button>
           </div>
           {mode === "upload" ? (
@@ -187,7 +191,7 @@ export function MediaSlot({ index, status, onChange }: Props) {
                 onClick={() => fileInputRef.current?.click()}
                 className="rounded-full border border-black/[.08] py-1 text-sm hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
               >
-                Choose file
+                {t("newPost.chooseFile")}
               </button>
             </>
           ) : (
@@ -195,7 +199,7 @@ export function MediaSlot({ index, status, onChange }: Props) {
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Prompt (e.g. leather sneaker on white)"
+                placeholder={t("newPost.prompt")}
                 rows={2}
                 className="rounded border border-black/[.12] bg-transparent p-2 text-xs outline-none focus:border-foreground dark:border-white/[.2]"
               />
@@ -205,7 +209,7 @@ export function MediaSlot({ index, status, onChange }: Props) {
                 onClick={handleGenerate}
                 className="rounded-full bg-foreground py-1 text-sm text-background hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
               >
-                Generate 4 variants
+                {t("newPost.generateVariants")}
               </button>
             </>
           )}

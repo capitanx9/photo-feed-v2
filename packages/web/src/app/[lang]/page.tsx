@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiFetchError, api, type Page, type Post } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import { PostCard } from "@/components/PostCard";
 
 const FEED_PAGE_PATH = "/api/posts/";
@@ -30,6 +31,7 @@ function readInitialMode(): Mode {
 }
 
 export default function Home() {
+  const t = useT();
   const [posts, setPosts] = useState<Post[]>([]);
   const [nextUrl, setNextUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,12 +56,12 @@ export default function Home() {
       const msg =
         err instanceof ApiFetchError
           ? (err.data.detail as string) || `HTTP ${err.status}`
-          : "Failed to load feed";
+          : t("feed.loading");
       setError(msg);
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     // Initial load is a side-effect that intentionally sets state.
@@ -86,25 +88,23 @@ export default function Home() {
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Feed</h1>
+        <h1 className="text-2xl font-semibold">{t("feed.title")}</h1>
         <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
           <input
             type="checkbox"
             checked={mode === "infinite"}
             onChange={(e) => setMode(e.target.checked ? "infinite" : "manual")}
           />
-          Infinite scroll
+          {t("feed.infiniteScroll")}
         </label>
       </div>
 
       {loading ? (
-        <p className="py-16 text-center text-zinc-500">Loading…</p>
+        <p className="py-16 text-center text-zinc-500">{t("feed.loading")}</p>
       ) : error ? (
         <p className="py-16 text-center text-red-600">{error}</p>
       ) : posts.length === 0 ? (
-        <p className="py-16 text-center text-zinc-500">
-          No posts yet. Be the first to publish something.
-        </p>
+        <p className="py-16 text-center text-zinc-500">{t("feed.empty")}</p>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
@@ -115,7 +115,7 @@ export default function Home() {
 
           {nextUrl && mode === "infinite" && (
             <div ref={sentinelRef} className="py-6 text-center text-sm text-zinc-500">
-              {loadingMore ? "Loading more…" : ""}
+              {loadingMore ? t("feed.loadingMore") : ""}
             </div>
           )}
           {nextUrl && mode === "manual" && (
@@ -126,13 +126,13 @@ export default function Home() {
                 onClick={() => loadPage(nextUrl, false)}
                 className="rounded-full border border-black/[.08] px-4 py-2 text-sm hover:bg-black/[.04] disabled:opacity-60 dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
               >
-                {loadingMore ? "Loading…" : "Load more"}
+                {loadingMore ? t("feed.loadingMore") : t("feed.loadMore")}
               </button>
             </div>
           )}
           {!nextUrl && posts.length > 0 && (
             <p className="py-6 text-center text-sm text-zinc-400">
-              End of feed
+              {t("feed.endOfFeed")}
             </p>
           )}
         </>

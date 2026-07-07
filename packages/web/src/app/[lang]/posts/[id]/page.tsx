@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { ApiFetchError, api, type Post, type User } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useHref, useT } from "@/lib/i18n";
 
 export default function PostDetailPage({
   params,
@@ -14,6 +15,8 @@ export default function PostDetailPage({
   const { id } = use(params);
   const { user: me } = useAuth();
   const router = useRouter();
+  const t = useT();
+  const href = useHref();
 
   const [post, setPost] = useState<Post | null>(null);
   const [owner, setOwner] = useState<User | null>(null);
@@ -46,9 +49,9 @@ export default function PostDetailPage({
         setError(
           err instanceof ApiFetchError
             ? err.status === 404
-              ? "Post not found"
+              ? t("post.notFound")
               : (err.data.detail as string) || `HTTP ${err.status}`
-            : "Failed to load post",
+            : t("post.loadFailed"),
         );
       }
     }
@@ -56,11 +59,11 @@ export default function PostDetailPage({
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, t]);
 
   async function handleAddToCart() {
     if (!me) {
-      router.push("/login");
+      router.push(href("/login"));
       return;
     }
     if (!post) return;
@@ -74,7 +77,7 @@ export default function PostDetailPage({
         message:
           err instanceof ApiFetchError
             ? (err.data.detail as string) || `HTTP ${err.status}`
-            : "Failed to add",
+            : t("post.loadFailed"),
       });
     }
   }
@@ -89,7 +92,7 @@ export default function PostDetailPage({
   if (!post) {
     return (
       <main className="mx-auto flex w-full max-w-4xl flex-1 items-center justify-center px-4 py-16">
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-zinc-500">{t("common.loading")}</p>
       </main>
     );
   }
@@ -111,7 +114,7 @@ export default function PostDetailPage({
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-sm text-zinc-400">
-              No image
+              {t("feed.noImage")}
             </div>
           )}
         </div>
@@ -144,15 +147,10 @@ export default function PostDetailPage({
       <aside className="flex flex-col gap-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-zinc-500">
-            Author
+            {t("post.author")}
           </p>
           {owner ? (
-            <Link
-              href={`/users/${owner.id}`}
-              className="text-sm hover:underline"
-            >
-              {owner.email}
-            </Link>
+            <span className="text-sm">{owner.email}</span>
           ) : (
             <p className="text-sm text-zinc-400">User #{post.owner_id}</p>
           )}
@@ -161,7 +159,7 @@ export default function PostDetailPage({
         {post.caption && (
           <div>
             <p className="text-xs uppercase tracking-wide text-zinc-500">
-              Caption
+              {t("post.caption")}
             </p>
             <p className="whitespace-pre-line text-sm">{post.caption}</p>
           </div>
@@ -177,12 +175,12 @@ export default function PostDetailPage({
               className="mt-3 w-full rounded-full bg-foreground py-2 text-background hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
             >
               {isOwner
-                ? "Your own post"
+                ? t("post.yourOwn")
                 : cartStatus.kind === "adding"
-                  ? "Adding…"
+                  ? t("post.adding")
                   : cartStatus.kind === "added"
-                    ? "Added ✓"
-                    : "Add to cart"}
+                    ? t("post.added")
+                    : t("post.addToCart")}
             </button>
             {cartStatus.kind === "error" && (
               <p aria-live="polite" className="mt-2 text-sm text-red-600">
@@ -191,19 +189,20 @@ export default function PostDetailPage({
             )}
             {cartStatus.kind === "added" && (
               <Link
-                href="/cart"
+                href={href("/cart")}
                 className="mt-2 block text-center text-sm underline"
               >
-                Go to cart
+                {t("post.goToCart")}
               </Link>
             )}
           </div>
         ) : (
-          <p className="text-sm text-zinc-500">Not for sale</p>
+          <p className="text-sm text-zinc-500">{t("post.notForSale")}</p>
         )}
 
         <p className="text-xs text-zinc-400">
-          Posted {new Date(post.created_at).toLocaleDateString()}
+          {t("post.postedOn")}{" "}
+          {new Date(post.created_at).toLocaleDateString()}
         </p>
       </aside>
     </main>

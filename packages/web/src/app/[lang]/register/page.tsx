@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ApiFetchError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useHref, useT } from "@/lib/i18n";
 
 function formatFieldErrors(data: Record<string, unknown>): string {
   const parts: string[] = [];
@@ -19,6 +20,8 @@ function formatFieldErrors(data: Record<string, unknown>): string {
 export default function RegisterPage() {
   const { register } = useAuth();
   const router = useRouter();
+  const t = useT();
+  const href = useHref();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -30,15 +33,15 @@ export default function RegisterPage() {
     setPending(true);
     try {
       await register(email, password);
-      router.push("/");
+      router.push(href("/"));
       router.refresh();
     } catch (err) {
       if (err instanceof ApiFetchError) {
         const detail = (err.data.detail as string) ?? "";
         const fields = formatFieldErrors(err.data);
-        setError(fields || detail || "Registration failed");
+        setError(fields || detail || t("auth.registerFailed"));
       } else {
-        setError("Something went wrong. Try again.");
+        setError(t("auth.somethingWrong"));
       }
     } finally {
       setPending(false);
@@ -47,10 +50,10 @@ export default function RegisterPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-16">
-      <h1 className="mb-6 text-2xl font-semibold">Create account</h1>
+      <h1 className="mb-6 text-2xl font-semibold">{t("auth.registerTitle")}</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm">
-          Email
+          {t("auth.email")}
           <input
             type="email"
             name="email"
@@ -62,7 +65,7 @@ export default function RegisterPage() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Password
+          {t("auth.password")}
           <input
             type="password"
             name="password"
@@ -84,13 +87,13 @@ export default function RegisterPage() {
           disabled={pending}
           className="rounded-full bg-foreground py-2 text-background hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
         >
-          {pending ? "Creating…" : "Create account"}
+          {pending ? t("auth.registerPending") : t("auth.registerSubmit")}
         </button>
       </form>
       <p className="mt-6 text-center text-sm text-zinc-500">
-        Have an account?{" "}
-        <Link href="/login" className="underline">
-          Log in
+        {t("auth.haveAccount")}{" "}
+        <Link href={href("/login")} className="underline">
+          {t("nav.login")}
         </Link>
       </p>
     </main>

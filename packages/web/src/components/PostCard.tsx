@@ -1,14 +1,19 @@
+"use client";
+
 import Link from "next/link";
 import type { Post } from "@/lib/api";
+import { useHref, useT } from "@/lib/i18n";
 
 export function PostCard({ post }: { post: Post }) {
+  const t = useT();
+  const href = useHref();
   const readyMedia = post.media.filter((m) => m.status === "ready" && m.url);
   const cover = readyMedia[0];
   const extras = readyMedia.length - 1;
 
   return (
     <Link
-      href={`/posts/${post.id}`}
+      href={href(`/posts/${post.id}`)}
       className="group flex flex-col overflow-hidden rounded-lg border border-black/[.08] transition-shadow hover:shadow-md dark:border-white/[.145]"
     >
       <div className="relative aspect-square bg-zinc-100 dark:bg-zinc-900">
@@ -22,7 +27,7 @@ export function PostCard({ post }: { post: Post }) {
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-zinc-400">
-            No image
+            {t("feed.noImage")}
           </div>
         )}
         {extras > 0 && (
@@ -33,7 +38,9 @@ export function PostCard({ post }: { post: Post }) {
       </div>
       <div className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
         <p className="line-clamp-1 text-zinc-700 dark:text-zinc-200">
-          {post.caption || <span className="text-zinc-400">Untitled</span>}
+          {post.caption || (
+            <span className="text-zinc-400">{t("feed.untitled")}</span>
+          )}
         </p>
         {post.price && (
           <p className="whitespace-nowrap font-medium">€{post.price}</p>

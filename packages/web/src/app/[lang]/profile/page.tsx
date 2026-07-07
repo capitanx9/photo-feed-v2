@@ -4,11 +4,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { ApiFetchError, api, type User } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useHref, useT } from "@/lib/i18n";
 import { UploadError, uploadFile, waitForMediaReady } from "@/lib/upload";
 
 export default function ProfilePage() {
   const { user, loading, refreshUser } = useAuth();
   const router = useRouter();
+  const t = useT();
+  const href = useHref();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<
     | { kind: "idle" }
@@ -18,13 +21,13 @@ export default function ProfilePage() {
   >({ kind: "idle" });
 
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [loading, user, router]);
+    if (!loading && !user) router.replace(href("/login"));
+  }, [loading, user, router, href]);
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    e.target.value = ""; // let the user re-pick the same file after an error
+    e.target.value = "";
 
     setStatus({ kind: "uploading" });
     try {
@@ -40,7 +43,7 @@ export default function ProfilePage() {
           ? err.message
           : err instanceof ApiFetchError
             ? (err.data.detail as string) || `HTTP ${err.status}`
-            : "Upload failed";
+            : t("auth.somethingWrong");
       setStatus({ kind: "error", message });
     }
   }
@@ -48,7 +51,7 @@ export default function ProfilePage() {
   if (loading || !user) {
     return (
       <main className="mx-auto flex w-full max-w-2xl flex-1 items-center justify-center px-4 py-16">
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-zinc-500">{t("common.loading")}</p>
       </main>
     );
   }
@@ -58,7 +61,7 @@ export default function ProfilePage() {
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10">
-      <h1 className="mb-6 text-2xl font-semibold">Profile</h1>
+      <h1 className="mb-6 text-2xl font-semibold">{t("profile.title")}</h1>
 
       <section className="flex items-start gap-6">
         <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border border-black/[.08] bg-zinc-100 dark:border-white/[.145] dark:bg-zinc-900">
@@ -77,7 +80,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-zinc-500">Signed in as</p>
+          <p className="text-sm text-zinc-500">{t("profile.signedInAs")}</p>
           <p className="font-medium">{user.email}</p>
 
           <input
@@ -94,10 +97,10 @@ export default function ProfilePage() {
             className="rounded-full border border-black/[.08] px-4 py-2 text-sm hover:bg-black/[.04] disabled:opacity-60 dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
           >
             {status.kind === "uploading"
-              ? "Uploading…"
+              ? t("profile.uploading")
               : status.kind === "processing"
-                ? "Processing…"
-                : "Change avatar"}
+                ? t("profile.processing")
+                : t("profile.changeAvatar")}
           </button>
 
           {status.kind === "error" && (
@@ -105,9 +108,7 @@ export default function ProfilePage() {
               {status.message}
             </p>
           )}
-          <p className="text-xs text-zinc-500">
-            JPEG / PNG / WebP · up to 10&nbsp;MB · cropped to 512×512
-          </p>
+          <p className="text-xs text-zinc-500">{t("profile.avatarHint")}</p>
         </div>
       </section>
     </main>
