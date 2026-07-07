@@ -33,5 +33,6 @@ indent-style = "space"
 "**/serializers.py" = ["RUF012"]
 "**/models.py" = ["RUF012"]
 "**/admin.py" = ["RUF012"]
-# tts.py hosts a DRF APIView too, same RUF012 misfire.
+# tts.py + stt.py host DRF APIViews too, same RUF012 misfire.
 "**/tts.py" = ["RUF012"]
+"**/stt.py" = ["RUF012"]

@@ -484,6 +484,20 @@ Resources:
                 Action:
                   - polly:SynthesizeSpeech
                 Resource: "*"
+        # Amazon Transcribe powers /api/stt/. StartTranscriptionJob and
+        # GetTranscriptionJob don't accept resource ARNs; S3 access to
+        # the media + output objects is already covered by the S3Uploads
+        # statement above (Transcribe uses the caller's identity for
+        # both reads and writes).
+        - PolicyName: PhotoFeedInstanceRole-Transcribe
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - transcribe:StartTranscriptionJob
+                  - transcribe:GetTranscriptionJob
+                Resource: "*"
 
   PhotoFeedInstanceProfile:
     Type: AWS::IAM::InstanceProfile

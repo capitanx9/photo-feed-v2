@@ -75,6 +75,13 @@ Resources:
             Status: Enabled
             Prefix: raw/
             ExpirationInDays: 7
+          # STT uploads + Transcribe result JSON are one-shot: consumed
+          # by the /api/stt/ endpoint and never referenced again. 1 day
+          # is enough for debug + AWS retry.
+          - Id: ExpireStt
+            Status: Enabled
+            Prefix: stt/
+            ExpirationInDays: 1
           # Aborted multipart uploads are billable. Auto-clean after 1 day.
           - Id: AbortIncompleteMultipart
             Status: Enabled
