@@ -17,6 +17,10 @@ on:
     paths:
       - "infra/cf/base/**"
       - ".github/workflows/deploy-infra-base.yml"
+      # DNS is deployed by deploy-infra-dns.yml (needs a bespoke import
+      # bootstrap; see infra/cf/base/dns.yaml). Skip it here so we don't
+      # try to `deploy` a non-existent stack from a fresh clone.
+      - "!infra/cf/base/dns.yaml"
   workflow_dispatch:
 
 concurrency:

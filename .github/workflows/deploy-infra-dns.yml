@@ -1,0 +1,64 @@
+name: deploy-infra-dns
+
+# Applies CloudFormation changes to the DNS stack (Route 53 hosted zone
+# + records). Kept separate from deploy-infra-base because the very
+# first bootstrap for this stack is a MANUAL `create-change-set
+# --change-set-type IMPORT` — see the header of infra/cf/base/dns.yaml.
+# The workflow refuses to run before that import has happened, so a
+# fresh clone can never destroy the live domain.
+#
+# Triggered on push to main when infra/cf/base/dns.yaml changes.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/cf/base/dns.yaml"
+      - ".github/workflows/deploy-infra-dns.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: photo-feed-deploy-infra-dns
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-central-1
+  ROLE_ARN: arn:aws:iam::797890596022:role/photo-feed-github-actions-infra
+  STACK_NAME: photo-feed-base-dns
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Guard against a fresh clone re-creating the hosted zone from
+      # scratch: the stack must already exist (via the one-time IMPORT
+      # documented in infra/cf/base/dns.yaml). If it doesn't, print how
+      # to bootstrap and exit non-zero.
+      - name: Assert stack has been imported
+        run: |
+          if ! aws cloudformation describe-stacks \
+                --stack-name "${STACK_NAME}" \
+                --region "${AWS_REGION}" >/dev/null 2>&1; then
+            echo "::error::Stack ${STACK_NAME} does not exist. Run the one-time IMPORT documented at the top of infra/cf/base/dns.yaml before merging DNS changes."
+            exit 1
+          fi
+
+      - name: Deploy dns
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cf/base/dns.yaml \
+            --stack-name "${STACK_NAME}" \
+            --region "${AWS_REGION}" \
+            --no-fail-on-empty-changeset
