@@ -3,6 +3,8 @@
 #
 #   db          postgres
 #   redis       broker + cache
+#   minio       S3-compatible object store on :9000 (console :9001)
+#   minio-init  one-shot bucket provisioner
 #   api         Django runserver on :8000
 #   api-worker  Celery worker (AI generate + friends)
 #   api-beat    Celery beat (hourly orphan-media cleanup)
@@ -50,6 +52,43 @@ services:
     volumes:
       - dev_redis:/data
 
+  # Local S3 stand-in so seed.py and the media/AI flows can put_object /
+  # get_object without real AWS creds. Everything in-repo that reads S3
+  # honours AWS_S3_ENDPOINT_URL (see packages/api/src/common/s3.py). The
+  # console at http://localhost:9001 (user `minio`, pass `minio123`)
+  # lets you poke at objects the way you would in the AWS console.
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    command: server /data --console-address ":9001"
+    volumes:
+      - dev_minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Creates the buckets the app expects and exits. depends_on ordering
+  # keeps api/worker from booting until this has provisioned.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 minio minio123;
+        mc mb --ignore-existing local/photo-feed-uploads;
+        mc mb --ignore-existing local/photo-feed-generated-usw2;
+        mc anonymous set download local/photo-feed-uploads;
+      "
+
   api:
     build:
       context: .
@@ -68,9 +107,19 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       RATELIMIT_ENABLE: "false"
-      # Uncomment + fill in to exercise S3 / Bedrock end-to-end from dev.
-      # AWS_REGION: eu-central-1
-      # S3_UPLOADS_BUCKET: photo-feed-uploads-dev
+      # S3 goes to the local MinIO. Real AWS credentials aren't needed
+      # in dev — MinIO speaks the S3 API with the fake key/secret below.
+      AWS_REGION: eu-central-1
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: minio123
+      AWS_S3_ENDPOINT_URL: http://minio:9000
+      # Presigner URLs land in the browser, so they must resolve from
+      # the host, not from inside the docker network.
+      AWS_S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+      S3_UPLOADS_BUCKET: photo-feed-uploads
+      S3_GENERATED_BUCKET: photo-feed-generated-usw2
+      S3_GENERATED_REGION: eu-central-1
+      # Uncomment to route AI generation through the real Bedrock lambda.
       # BEDROCK_REGION: us-west-2
       # GENERATE_IMAGE_LAMBDA_NAME: photo-feed-generate-image-stage
     volumes:
@@ -84,6 +133,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      minio-init:
+        condition: service_completed_successfully
 
   api-worker:
     build:
@@ -100,6 +151,14 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
+      AWS_REGION: eu-central-1
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: minio123
+      AWS_S3_ENDPOINT_URL: http://minio:9000
+      AWS_S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+      S3_UPLOADS_BUCKET: photo-feed-uploads
+      S3_GENERATED_BUCKET: photo-feed-generated-usw2
+      S3_GENERATED_REGION: eu-central-1
     volumes:
       - ./packages/api:/app/packages/api
     working_dir: /app/packages/api
@@ -111,8 +170,12 @@ services:
       - --loglevel=info
       - --concurrency=2
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_started
+      minio-init:
+        condition: service_completed_successfully
 
   api-beat:
     build:
@@ -129,6 +192,11 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
+      AWS_REGION: eu-central-1
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: minio123
+      AWS_S3_ENDPOINT_URL: http://minio:9000
+      S3_UPLOADS_BUCKET: photo-feed-uploads
     volumes:
       - ./packages/api:/app/packages/api
     working_dir: /app/packages/api
@@ -140,6 +208,8 @@ services:
       - --loglevel=info
       - --schedule=/tmp/celerybeat-schedule
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_started
 
@@ -168,5 +238,6 @@ services:
 volumes:
   dev_postgres:
   dev_redis:
+  dev_minio:
   dev_web_node_modules:
   dev_web_next:
