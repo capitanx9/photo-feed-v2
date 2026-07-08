@@ -121,8 +121,19 @@ class Command(BaseCommand):
 
 
 def _wipe_seed_users() -> int:
-    qs = User.objects.filter(email__endswith=f"@{SEED_DOMAIN}")
-    deleted, _ = qs.delete()
+    """Delete every @seed.local user + everything hanging off them.
+
+    OrderItem.post is PROTECT (historical orders preserve line items),
+    so Django's cascade can't delete a seed user whose post is
+    referenced by any Order. We reach in and wipe those Orders first,
+    even the ones owned by non-seed accounts, since they'd break
+    integrity if left dangling against a deleted post.
+    """
+    seed_qs = User.objects.filter(email__endswith=f"@{SEED_DOMAIN}")
+    # Any Order that contains a seed post has to go — the OrderItem's
+    # PROTECT would otherwise block the user delete.
+    Order.objects.filter(items__post__owner__in=seed_qs).distinct().delete()
+    deleted, _ = seed_qs.delete()
     return deleted
 
 
@@ -131,10 +142,12 @@ def _wipe_non_superuser_users() -> int:
 
     Django superusers are the one class of account this command will
     never touch — otherwise you'd have to recreate the admin after
-    every reset.
+    every reset. Same PROTECT-on-OrderItem story as _wipe_seed_users:
+    wipe every Order first so cascade doesn't hit a locked post.
     """
-    qs = User.objects.filter(is_superuser=False)
-    deleted, _ = qs.delete()
+    victims = User.objects.filter(is_superuser=False)
+    Order.objects.filter(items__post__owner__in=victims).distinct().delete()
+    deleted, _ = victims.delete()
     return deleted
 
 
@@ -142,6 +155,9 @@ def _wipe_posts(*, seed_only: bool) -> int:
     qs = Post.objects.all()
     if seed_only:
         qs = qs.filter(owner__email__endswith=f"@{SEED_DOMAIN}")
+    # OrderItem.post is PROTECT — drop the orders that reference these
+    # posts before we try to delete the posts themselves.
+    Order.objects.filter(items__post__in=qs).distinct().delete()
     # PostMedia cascades on Post delete via on_delete=CASCADE.
     deleted, _ = qs.delete()
     return deleted
