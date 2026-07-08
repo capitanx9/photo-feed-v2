@@ -18,8 +18,11 @@ below).
 **Admin**:
 
 - URL: `https://stage.photo-feed.click/admin/`
-- Credentials: **on request from the repo owner.** The repo is public;
-  admin creds are not.
+- Email: `admin@photo-feed.click`
+- Password: `12345`
+
+Stage is a lab environment — no real customer data lives there, so the
+admin creds are in the repo. Do NOT reuse this pattern on prod.
 
 The admin panel is a stock Django admin with the orders app registered
 — the `Approve` action flips `pending` orders to `paid` (see
