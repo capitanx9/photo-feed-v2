@@ -46,24 +46,29 @@ export default function Home() {
     localStorage.setItem(SCROLL_MODE_KEY, mode);
   }, [mode]);
 
-  const loadPage = useCallback(async (path: string, replace: boolean) => {
-    const setBusy = replace ? setLoading : setLoadingMore;
-    setBusy(true);
-    setError(null);
-    try {
-      const page = await api.get<Page<Post>>(path);
-      setPosts((prev) => (replace ? page.results : [...prev, ...page.results]));
-      setNextUrl(page.next ? toRelative(page.next) : null);
-    } catch (err) {
-      const msg =
-        err instanceof ApiFetchError
-          ? (err.data.detail as string) || `HTTP ${err.status}`
-          : t("feed.loading");
-      setError(msg);
-    } finally {
-      setBusy(false);
-    }
-  }, [t]);
+  const loadPage = useCallback(
+    async (path: string, replace: boolean) => {
+      const setBusy = replace ? setLoading : setLoadingMore;
+      setBusy(true);
+      setError(null);
+      try {
+        const page = await api.get<Page<Post>>(path);
+        setPosts((prev) =>
+          replace ? page.results : [...prev, ...page.results],
+        );
+        setNextUrl(page.next ? toRelative(page.next) : null);
+      } catch (err) {
+        const msg =
+          err instanceof ApiFetchError
+            ? (err.data.detail as string) || `HTTP ${err.status}`
+            : t("feed.loading");
+        setError(msg);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     // Initial load is a side-effect that intentionally sets state.
@@ -142,7 +147,10 @@ export default function Home() {
           </div>
 
           {nextUrl && mode === "infinite" && (
-            <div ref={sentinelRef} className="py-6 text-center text-sm text-zinc-500">
+            <div
+              ref={sentinelRef}
+              className="py-6 text-center text-sm text-zinc-500"
+            >
               {loadingMore ? t("feed.loadingMore") : ""}
             </div>
           )}

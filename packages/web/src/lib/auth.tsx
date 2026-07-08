@@ -38,7 +38,9 @@ const AuthContext = createContext<AuthState | null>(null);
 // pre-route contexts.
 function localeFromPath(pathname: string): string {
   const first = pathname.split("/")[1] ?? "";
-  return (LOCALES as readonly string[]).includes(first) ? first : DEFAULT_LOCALE;
+  return (LOCALES as readonly string[]).includes(first)
+    ? first
+    : DEFAULT_LOCALE;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

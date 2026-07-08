@@ -99,11 +99,7 @@ function OrdersInner() {
       ) : (
         <ul className="flex flex-col gap-3">
           {orders.map((o) => (
-            <OrderRow
-              key={o.id}
-              order={o}
-              highlighted={o.id === highlightId}
-            />
+            <OrderRow key={o.id} order={o} highlighted={o.id === highlightId} />
           ))}
         </ul>
       )}

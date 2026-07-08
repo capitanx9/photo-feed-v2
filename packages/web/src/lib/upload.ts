@@ -39,9 +39,7 @@ export async function uploadFile(
     );
   }
   if (file.size <= 0 || file.size > MAX_BYTES) {
-    throw new UploadError(
-      `File must be under ${MAX_BYTES / 1024 / 1024} MB.`,
-    );
+    throw new UploadError(`File must be under ${MAX_BYTES / 1024 / 1024} MB.`);
   }
 
   const presigned = await api.post<UploadURLResponse>(
@@ -70,7 +68,10 @@ export async function uploadFile(
 // under a couple of seconds and the endpoint is cheap.
 export async function waitForMediaReady(
   mediaId: number,
-  { timeoutMs = 60_000, intervalMs = 1_500 }: {
+  {
+    timeoutMs = 60_000,
+    intervalMs = 1_500,
+  }: {
     timeoutMs?: number;
     intervalMs?: number;
   } = {},

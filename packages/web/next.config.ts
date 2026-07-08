@@ -10,12 +10,16 @@ const nextConfig: NextConfig = {
   // were same-origin in dev too. In prod, nginx does this routing; here,
   // Next forwards /api/ requests to the Django runserver. Skipped in
   // production (NODE_ENV=production) so nginx stays in charge.
+  //
+  // API_ORIGIN lets docker-compose.dev.yml point at the api container
+  // (http://api:8000) instead of the default host-based localhost.
   async rewrites() {
     if (process.env.NODE_ENV === "production") return [];
+    const apiOrigin = process.env.API_ORIGIN || "http://localhost:8000";
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:8000/api/:path*",
+        destination: `${apiOrigin}/api/:path*`,
       },
     ];
   },

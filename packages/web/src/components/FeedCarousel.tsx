@@ -217,7 +217,9 @@ export function FeedCarousel({
             <div className="mt-2 flex items-center justify-center gap-4 text-sm text-zinc-300">
               <span>#{current.id}</span>
               {current.price && (
-                <span className="font-medium text-white">&euro;{current.price}</span>
+                <span className="font-medium text-white">
+                  &euro;{current.price}
+                </span>
               )}
             </div>
           </div>

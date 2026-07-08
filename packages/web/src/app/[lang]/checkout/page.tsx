@@ -15,7 +15,12 @@ import { useHref, useT } from "@/lib/i18n";
 import { fieldBorder, hasErrors, type FieldErrors } from "@/lib/validation";
 import { OrderWaitPopup } from "@/components/OrderWaitPopup";
 
-const PAYMENT_METHOD_KEYS: PaymentMethod[] = ["card", "paypal", "crypto", "cod"];
+const PAYMENT_METHOD_KEYS: PaymentMethod[] = [
+  "card",
+  "paypal",
+  "crypto",
+  "cod",
+];
 
 type CheckoutField = "name" | "address" | "city" | "zip";
 
@@ -73,8 +78,7 @@ export default function CheckoutPage() {
   }
 
   function clearFieldError(field: CheckoutField) {
-    if (errors[field])
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
 
   async function handleSubmit(ev: FormEvent<HTMLFormElement>) {

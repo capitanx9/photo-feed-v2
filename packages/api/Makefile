@@ -1,5 +1,10 @@
 UV := uv
 
+# Runs the Django dev server against your host uv env — no docker.
+# Prefer `make dev-up` from the repo root for a real end-to-end stack;
+# these targets are useful when you only want to poke at the Django
+# process itself.
+
 install:
 	$(UV) sync
 
@@ -7,7 +12,12 @@ dev:
 	$(UV) run python manage.py runserver
 
 worker:
-	$(UV) run celery -A api.celery_app worker --loglevel=infomigrate:
+	$(UV) run celery -A api.celery_app worker --loglevel=info
+
+beat:
+	$(UV) run celery -A api.celery_app beat --loglevel=info
+
+migrate:
 	$(UV) run python manage.py migrate
 
 makemigrations:
@@ -34,17 +44,7 @@ typecheck:
 lock:
 	$(UV) lock
 
-docker:
-	docker compose up --build
-
-docker-down:
-	docker compose down
-
 clean:
 	rm -rf __pycache__ .mypy_cache .pytest_cache .ruff_cache dist build *.egg-info .venv
 	find . -name "*.pyc" -delete
 	@echo "Clean done."
-
-info:
-	@$(UV) python list --only-installed
-	@$(UV) --version

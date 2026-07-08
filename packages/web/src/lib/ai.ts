@@ -23,7 +23,10 @@ export async function startGeneration(prompt: string): Promise<number> {
 
 export async function waitForGeneration(
   jobId: number,
-  { timeoutMs = 120_000, intervalMs = 2_000 }: {
+  {
+    timeoutMs = 120_000,
+    intervalMs = 2_000,
+  }: {
     timeoutMs?: number;
     intervalMs?: number;
   } = {},

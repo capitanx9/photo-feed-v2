@@ -33,10 +33,7 @@ function serverErrorToast(): string {
   return SERVER_ERROR_TOAST[lang] ?? SERVER_ERROR_TOAST.en;
 }
 
-async function request<T>(
-  path: string,
-  init: RequestInit = {},
-): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     credentials: "include",
     headers: {
@@ -54,10 +51,7 @@ async function request<T>(
       // via the browser console/Sentry, and the user gets a toast so
       // the failure isn't silent while individual callers unwind.
       console.error("api 5xx", res.status, path, data);
-      toast(
-        (data.detail as string | undefined) ?? serverErrorToast(),
-        "error",
-      );
+      toast((data.detail as string | undefined) ?? serverErrorToast(), "error");
     }
     throw new ApiFetchError(res.status, data);
   }
