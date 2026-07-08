@@ -47,8 +47,7 @@ export function OrderWaitPopup({ orderId, onConfirmed, onCancel }: Props) {
           if (cancelledRef.current) return;
           // 404 means the endpoint isn't deployed yet; treat like a
           // transient error and back off. Any other network hiccup: same.
-          const status =
-            err instanceof ApiFetchError ? err.status : undefined;
+          const status = err instanceof ApiFetchError ? err.status : undefined;
           if (status !== undefined && status !== 404 && status < 500) {
             // Unexpected client error (401/403 etc.) — bail out to /orders
             // so the user isn't stuck behind an unrecoverable modal.

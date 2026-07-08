@@ -6,10 +6,7 @@ import { use, useEffect, useState } from "react";
 import { ApiFetchError, api, type Post, type User } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useHref, useT } from "@/lib/i18n";
-import {
-  TTS_MIN_CAPTION_CHARS,
-  synthesizeCaption,
-} from "@/lib/tts";
+import { TTS_MIN_CAPTION_CHARS, synthesizeCaption } from "@/lib/tts";
 
 export default function PostDetailPage({
   params,
@@ -260,8 +257,7 @@ export default function PostDetailPage({
         )}
 
         <p className="text-xs text-zinc-400">
-          {t("post.postedOn")}{" "}
-          {new Date(post.created_at).toLocaleDateString()}
+          {t("post.postedOn")} {new Date(post.created_at).toLocaleDateString()}
         </p>
       </aside>
     </main>

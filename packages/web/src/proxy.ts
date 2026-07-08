@@ -13,9 +13,7 @@ import { DEFAULT_LOCALE, LOCALES, LOCALE_COOKIE } from "@/lib/i18n-config";
 export const config = {
   // Skip Next internals, the /api proxy (which is nginx-served in prod
   // and doesn't need a locale), and static asset paths.
-  matcher: [
-    "/((?!api|_next|internal|favicon\\.ico|.*\\.[a-z0-9]+$).*)",
-  ],
+  matcher: ["/((?!api|_next|internal|favicon\\.ico|.*\\.[a-z0-9]+$).*)"],
 };
 
 function pickLocale(request: NextRequest): string {

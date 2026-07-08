@@ -50,7 +50,9 @@ export default function NewPostPage() {
   }
 
   const readyMediaIds = slots
-    .filter((s): s is Extract<SlotStatus, { kind: "ready" }> => s.kind === "ready")
+    .filter(
+      (s): s is Extract<SlotStatus, { kind: "ready" }> => s.kind === "ready",
+    )
     .map((s) => s.mediaId);
 
   function validate(): FieldErrors<NewPostField> {

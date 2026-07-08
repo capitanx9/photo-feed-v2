@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1.7
+
+# Dev image for the Django API. Runs `manage.py runserver` with the
+# source mounted in from the host so edits reload instantly. Everything
+# needed to also run the Celery worker/beat is in the same image; the
+# compose file just switches CMD.
+
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
+    PYTHONPATH=/app/packages/api/src \
+    DJANGO_SETTINGS_MODULE=api.settings
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /workspace
+
+# Install deps once at image build. Source is mounted at runtime, so the
+# venv survives across code edits — no re-sync needed on every reload.
+COPY pyproject.toml uv.lock ./
+COPY packages/api/pyproject.toml packages/api/
+RUN uv sync --frozen --package api --no-install-project
+
+WORKDIR /app
+
+EXPOSE 8000
+
+# Default CMD; docker-compose.dev.yml overrides for worker + beat.
+CMD ["python", "packages/api/manage.py", "runserver", "0.0.0.0:8000"]

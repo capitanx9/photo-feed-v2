@@ -1,0 +1,172 @@
+# Local development stack — everything the app needs to run end-to-end
+# on your laptop with hot reload.
+#
+#   db          postgres
+#   redis       broker + cache
+#   api         Django runserver on :8000
+#   api-worker  Celery worker (AI generate + friends)
+#   api-beat    Celery beat (hourly orphan-media cleanup)
+#   web         Next.js `next dev` on :3000
+#
+# Sources are bind-mounted so edits reload without a rebuild. Images
+# rebuild only when Dockerfile.dev or lockfiles change.
+#
+# Usage:
+#   make dev-up          # start everything in the background
+#   make dev-logs        # tail every service
+#   make dev-migrate     # run Django migrations
+#   make dev-seed        # populate demo users + posts
+#   make dev-down        # stop
+#   make dev-reset-db    # wipe volume + fresh migrate + seed
+#
+# Notes:
+# - Nothing here needs AWS creds by default — S3/Bedrock calls will hit
+#   the real AWS if configured, but the golden path (auth/posts/cart)
+#   works standalone against local postgres + redis.
+# - `next dev` binds to 0.0.0.0 so http://localhost:3000 works from the
+#   host across every OS. Django `runserver` same story.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: api
+      POSTGRES_PASSWORD: api
+      POSTGRES_DB: api
+    ports:
+      - "5432:5432"
+    volumes:
+      - dev_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U api -d api"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - dev_redis:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile.dev
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_SECRET_KEY: dev-insecure-do-not-use-outside-localhost
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: api
+      POSTGRES_USER: api
+      POSTGRES_PASSWORD: api
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      RATELIMIT_ENABLE: "false"
+      # Uncomment + fill in to exercise S3 / Bedrock end-to-end from dev.
+      # AWS_REGION: eu-central-1
+      # S3_UPLOADS_BUCKET: photo-feed-uploads-dev
+      # BEDROCK_REGION: us-west-2
+      # GENERATE_IMAGE_LAMBDA_NAME: photo-feed-generate-image-stage
+    volumes:
+      - ./packages/api:/app/packages/api
+      - ./pyproject.toml:/workspace/pyproject.toml:ro
+      - ./uv.lock:/workspace/uv.lock:ro
+    working_dir: /app/packages/api
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  api-worker:
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile.dev
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_SECRET_KEY: dev-insecure-do-not-use-outside-localhost
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: api
+      POSTGRES_USER: api
+      POSTGRES_PASSWORD: api
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    volumes:
+      - ./packages/api:/app/packages/api
+    working_dir: /app/packages/api
+    command:
+      - celery
+      - -A
+      - api.celery_app
+      - worker
+      - --loglevel=info
+      - --concurrency=2
+    depends_on:
+      redis:
+        condition: service_started
+
+  api-beat:
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile.dev
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_SECRET_KEY: dev-insecure-do-not-use-outside-localhost
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: api
+      POSTGRES_USER: api
+      POSTGRES_PASSWORD: api
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    volumes:
+      - ./packages/api:/app/packages/api
+    working_dir: /app/packages/api
+    command:
+      - celery
+      - -A
+      - api.celery_app
+      - beat
+      - --loglevel=info
+      - --schedule=/tmp/celerybeat-schedule
+    depends_on:
+      redis:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: packages/web/Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      # Next.js dev server proxies /api/* to the Django api container.
+      # See packages/web/next.config.ts for the rewrite rules.
+      API_ORIGIN: http://api:8000
+    volumes:
+      - ./packages/web:/app/packages/web
+      # Keep the container's Linux node_modules — a host-side npm install
+      # would drop macOS/Windows binaries into this path and break the
+      # image.
+      - dev_web_node_modules:/app/packages/web/node_modules
+      # .next also container-owned; avoids ownership conflicts with host.
+      - dev_web_next:/app/packages/web/.next
+    depends_on:
+      - api
+
+volumes:
+  dev_postgres:
+  dev_redis:
+  dev_web_node_modules:
+  dev_web_next:

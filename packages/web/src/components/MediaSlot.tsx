@@ -16,11 +16,7 @@ import {
   transcribe,
   type RecordingSession,
 } from "@/lib/stt";
-import {
-  UploadError,
-  uploadFile,
-  waitForMediaReady,
-} from "@/lib/upload";
+import { UploadError, uploadFile, waitForMediaReady } from "@/lib/upload";
 
 type SlotStatus =
   | { kind: "empty" }
@@ -56,7 +52,9 @@ export function MediaSlot({ index, status, onChange }: Props) {
         recorderRef.current = await startRecording();
         setVoiceState("recording");
       } catch (err) {
-        setVoiceError(err instanceof STTError ? err.message : t("newPost.voiceFailed"));
+        setVoiceError(
+          err instanceof STTError ? err.message : t("newPost.voiceFailed"),
+        );
       }
       return;
     }
@@ -73,7 +71,9 @@ export function MediaSlot({ index, status, onChange }: Props) {
         const { text } = await transcribe(blob);
         const trimmed = text.trim();
         if (trimmed) {
-          setPrompt((prev) => (prev.trim() ? `${prev.trim()} ${trimmed}` : trimmed));
+          setPrompt((prev) =>
+            prev.trim() ? `${prev.trim()} ${trimmed}` : trimmed,
+          );
         } else {
           setVoiceError(t("newPost.voiceEmpty"));
         }
@@ -290,10 +290,7 @@ export function MediaSlot({ index, status, onChange }: Props) {
                 )}
               </div>
               {voiceError && (
-                <p
-                  aria-live="polite"
-                  className="text-[11px] text-red-600"
-                >
+                <p aria-live="polite" className="text-[11px] text-red-600">
                   {voiceError}
                 </p>
               )}
