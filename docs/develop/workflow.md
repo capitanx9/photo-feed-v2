@@ -55,6 +55,24 @@ uv run python packages/api/src/manage.py spectacular --validate
 
 Full target map: [make.md](make.md). Testing details: [testing.md](testing.md).
 
+## Testing UI flows end-to-end locally
+
+Some paths need real seed data + a manual admin nudge. Example — the
+checkout wait popup, which long-polls until an admin approves the
+order:
+
+```bash
+make dev-seed              # creates 5 pending orders
+# open http://localhost:3000, log in as user1@seed.local,
+# go to /orders — note the "pending" pills
+make dev-approve-all       # flips them all to paid
+# refresh /orders — pills flip; any active wait-confirm long-poll wakes
+```
+
+For destructive testing (deleting real data), same pattern with
+`dev-wipe-*` and `dev-reset-db` — see
+[make.md](make.md#wipe-dev).
+
 ## Push and open the PR
 
 ```bash
