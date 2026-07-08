@@ -34,14 +34,20 @@ Log in with any seed user (`user1@seed.local` … `user5@seed.local`, password `
 
 `docker-compose.dev.yml` spins up:
 
-| Service      | Port  | What it does                                          |
-|--------------|-------|-------------------------------------------------------|
-| `db`         | 5432  | Postgres 16                                           |
-| `redis`      | 6379  | Broker + cache                                        |
-| `api`        | 8000  | Django `runserver` — hot reload on `packages/api/`    |
-| `api-worker` | –     | Celery worker (AI generate, orphan-media cleanup, …)  |
-| `api-beat`   | –     | Celery beat scheduler (hourly cleanup task)           |
-| `web`        | 3000  | Next.js `next dev` — hot reload on `packages/web/`    |
+| Service      | Port      | What it does                                          |
+|--------------|-----------|-------------------------------------------------------|
+| `db`         | 5432      | Postgres 16                                           |
+| `redis`      | 6379      | Broker + cache                                        |
+| `minio`      | 9000/9001 | S3-compatible object store; console at :9001         |
+| `minio-init` | –         | Provisions buckets on first boot, then exits         |
+| `api`        | 8000      | Django `runserver` — hot reload on `packages/api/`    |
+| `api-worker` | –         | Celery worker (AI generate, orphan-media cleanup, …)  |
+| `api-beat`   | –         | Celery beat scheduler (hourly cleanup task)           |
+| `web`        | 3000      | Next.js `next dev` — hot reload on `packages/web/`    |
+
+MinIO console credentials: `minio` / `minio123` at <http://localhost:9001>.
+Media uploads, AI drafts, and everything else that hits S3 in prod land
+here in dev — no AWS credentials required for the golden path.
 
 Rate limiting is disabled in dev (`RATELIMIT_ENABLE=false`) so you can hammer `POST /api/ai/generate/` without hitting the hourly cap.
 
@@ -63,13 +69,11 @@ Full list: [Make targets](../develop/make.md).
 
 ## AWS-backed features in dev
 
-Some features (AI image generation via Bedrock, S3 uploads, TTS, STT) need real AWS credentials to work end-to-end. They're disabled by default — the golden path (auth, feed, cart, orders) works entirely offline.
+S3 is fully local via MinIO — uploads, TTS mp3 caching, AI-draft copying all just work.
 
-To exercise the AWS-backed paths from your laptop, uncomment the `AWS_REGION`, `S3_UPLOADS_BUCKET`, `BEDROCK_REGION`, `GENERATE_IMAGE_LAMBDA_NAME` env vars in `docker-compose.dev.yml` under the `api` and `api-worker` services, then export credentials in your shell before `make dev-up`:
+**Bedrock (AI generate) is the exception**: it needs a real Lambda + Bedrock model, so it isn't wired in dev by default. To exercise it, uncomment `BEDROCK_REGION` and `GENERATE_IMAGE_LAMBDA_NAME` under `api` and `api-worker` in `docker-compose.dev.yml`, replace the fake MinIO creds with your AWS SSO ones, and run:
 
 ```bash
-export AWS_PROFILE=cx9-gmail
 aws sso login --profile cx9-gmail
-make dev-up
 ```
 

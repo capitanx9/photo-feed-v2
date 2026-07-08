@@ -14,9 +14,7 @@ dev-createsuperuser:
 	$(DC_DEV) exec api python manage.py createsuperuser
 
 # Wipe the DB volume completely, then rebuild + migrate + seed. Use this
-# when a migration got wedged or you want a clean slate. Post-seed skips
-# posts by default because seed.py pulls placeholders from picsum.photos
-# and writes them to S3 — dev doesn't have S3 credentials.
+# when a migration got wedged or you want a clean slate.
 dev-reset-db:
 	$(DC_DEV) down -v
 	$(DC_DEV) up -d db
@@ -24,4 +22,4 @@ dev-reset-db:
 	@until $(DC_DEV) exec -T db pg_isready -U api -d api > /dev/null 2>&1; do sleep 1; done
 	$(DC_DEV) up -d
 	$(DC_DEV) exec -T api python manage.py migrate
-	$(DC_DEV) exec -T api python manage.py seed --users 5 --posts 0 --skip-posts
+	$(DC_DEV) exec -T api python manage.py seed --users 5 --posts 3
