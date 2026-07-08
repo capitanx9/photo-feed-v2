@@ -6,8 +6,12 @@
 # wipe.py itself, so `stage-wipe-all-users` still leaves the admin in
 # place — it just clears every real and demo account.
 
-.PHONY: stage-wipe-seed stage-wipe-posts stage-wipe-carts stage-wipe-orders \
+.PHONY: stage-wipe stage-wipe-seed stage-wipe-posts stage-wipe-carts stage-wipe-orders \
         stage-wipe-all-users stage-wipe-all-posts stage-wipe-all-carts stage-wipe-all-orders
+
+# Full nuke on stage. Django superusers are still preserved by wipe.py.
+stage-wipe:
+	$(SSM_EXEC) --parameters 'command=["sudo docker exec host-web-1 python manage.py wipe --scope all"]'
 
 stage-wipe-seed:
 	$(SSM_EXEC) --parameters 'command=["sudo docker exec host-web-1 python manage.py wipe --scope seed --stage-safe"]'
