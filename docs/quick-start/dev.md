@@ -4,6 +4,19 @@ Run the whole app locally end-to-end: Postgres, Redis, MinIO
 (S3-compatible), Django, Celery worker + beat, and Next.js — all in
 one docker compose stack with hot reload on the source.
 
+## Credentials
+
+**Seed users** (created by `make dev-seed`):
+
+- Email: `user1@seed.local` through `user5@seed.local`
+- Password: `stagepass123`
+
+**Admin**: create your own with `make dev-createsuperuser`. There is
+no default admin — dev never ships one.
+
+**Postgres**: `api` / `api` / `api` on `localhost:5432`.
+**MinIO console**: `minio` / `minio123` at <http://localhost:9001>.
+
 ## Prerequisites
 
 - Docker Desktop / Colima / Rancher — anything that gives you

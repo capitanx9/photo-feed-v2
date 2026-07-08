@@ -4,22 +4,25 @@ Live URL: `https://stage.photo-feed.click/`. Deployed continuously from
 `main`; every merge triggers a build + GitOps deploy (see
 [Deploy → CD](../deploy/cd.md)).
 
-## Try the app
+## Credentials
 
-Fastest path — no signup:
+**Seed users** (fastest way in — no signup):
 
-- `user1..5@seed.local`
-- Password `stagepass123`
+- Email: `user1@seed.local` through `user5@seed.local`
+- Password: `stagepass123`
 
 Every seed user has published posts you can browse, buy, or drop into
-a test cart. Regenerate with more data via `make stage-seed`
-(see below).
+a test cart. Regenerate with more data via `make stage-seed` (see
+below).
 
-## Admin
+**Admin**:
 
 - URL: `https://stage.photo-feed.click/admin/`
-- Credentials: **on request from the repo owner.** The repo is public;
-  admin creds are not.
+- Email: `admin@photo-feed.click`
+- Password: `12345`
+
+Stage is a lab environment — no real customer data lives there, so the
+admin creds are in the repo. Do NOT reuse this pattern on prod.
 
 The admin panel is a stock Django admin with the orders app registered
 — the `Approve` action flips `pending` orders to `paid` (see
